@@ -26,8 +26,11 @@
 			console.error('Failed to initialize Mixcore:', error);
 		}
 		
-		// Set demo preview URL
-		previewUrl.set('/demo');
+		// Set preview URL from environment variables, with a fallback.
+		// Vite exposes environment variables prefixed with VITE_ on the `import.meta.env` object.
+		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
+		previewUrl.set(endpoint || 'https://mixcore.net');
+
 	});
 	
 	// Reactive logic to show/hide welcome screen

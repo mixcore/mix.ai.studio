@@ -92,19 +92,17 @@ export class AuthModule {
     credentials: LoginCredentials, 
     callbacks?: AuthCallbacks
   ): Promise<TokenInfo> {
+    let tokenInfo: TokenInfo;
     try {
       // The incoming credentials might have `email` or `usernameOrEmail`.
       // We handle both to make the module robust. The `email` property is
       // likely being used as a generic identifier field.
       const identifier = (credentials as any).email || (credentials as any).usernameOrEmail;
       const { password } = credentials;
-
       // Validate input
       validateRequired(identifier, 'Username or Email');
       validateMinLength(password, 6, 'Password');
-
       const payload: { password: string; email?: string; userName?: string } = { password };
-
       if (isEmailFormat(identifier)) {
         validateEmail(identifier);
         payload.email = identifier;
@@ -112,37 +110,34 @@ export class AuthModule {
         // Assuming it's a username if it's not in email format.
         payload.userName = identifier;
       }
-
       // Make login request
       const response = await this.api.post<TokenInfo>('/rest/auth/user/login-unsecure', payload);
-      const tokenInfo = response.data;
-
+      tokenInfo = response.data;
       // Save token
       this.saveTokenToStorage(tokenInfo);
-
       // Get user data
       await this.initUserData();
-
-      // Call callbacks
-      callbacks?.success?.(tokenInfo);
-      this.onAuthSuccess?.();
-
-      return tokenInfo;
-
     } catch (error) {
       // Clear any partial auth state
       this.logout();
       callbacks?.error?.(error as Error);
       this.onAuthError?.();
-
+      callbacks?.finally?.();
       // Re-throw a more user-friendly error for login failures
       if (error instanceof Error && error.message.includes('HTTP Error')) {
         throw new Error('Login failed. Please check your credentials and ensure the API server is reachable.');
       }
       throw error; // Re-throw original error for other cases
-    } finally {
-      callbacks?.finally?.();
     }
+
+    // If we reach here, the try block was successful.
+    // Call success callbacks outside the try...catch block to prevent their errors
+    // from being caught by our authentication logic.
+    callbacks?.success?.(tokenInfo);
+    this.onAuthSuccess?.();
+    callbacks?.finally?.();
+
+    return tokenInfo;
   }
 
   async register(credentials: RegisterCredentials): Promise<User> {
