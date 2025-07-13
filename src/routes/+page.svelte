@@ -16,12 +16,7 @@
 	onMount(async () => {
 		// Initialize Mixcore service
 		try {
-			const initialized = await userActions.initialize();
-			if (initialized) {
-				showWelcome = false;
-			} else {
-				console.log('Mixcore not initialized - showing welcome screen');
-			}
+			await userActions.initialize();
 		} catch (error) {
 			console.error('Failed to initialize Mixcore:', error);
 		}
@@ -33,14 +28,9 @@
 
 	});
 	
-	// Reactive logic to show/hide welcome screen
-	$: {
-		if ($isAuthenticated && $hasProjects) {
-			showWelcome = false;
-		} else if (!$isAuthenticated) {
-			showWelcome = true;
-		}
-	}
+	// The welcome screen should only be visible when the user is not authenticated.
+	// This reactive statement makes the UI declarative and predictable.
+	$: showWelcome = !$isAuthenticated;
 	
 	function handleWelcomeLogin() {
 		authMode = 'login';
@@ -48,11 +38,9 @@
 	}
 	
 	function handleWelcomeGetStarted() {
-		if ($isAuthenticated) {
-			showWelcome = false;
-		} else {
-			handleWelcomeLogin();
-		}
+		// The WelcomeScreen is only visible when !$isAuthenticated,
+		// so we can directly open the login modal.
+		handleWelcomeLogin();
 	}
 	
 	function closeAuthModal() {
@@ -60,7 +48,8 @@
 	}
 	
 	function handleAuthSuccess() {
-		showAuthModal = false;
+		// The modal now closes itself on success.
+		// This function can be used for other post-login actions, like showing a toast.
 		showWelcome = false;
 	}
 </script>

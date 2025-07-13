@@ -23,14 +23,12 @@
 			loading = true;
 			error = '';
 			
-			const success = await userActions.login(email, password);
+			// Await the login action. If it throws an error, the catch block will handle it.
+			// If it resolves, we know it was successful.
+			await userActions.login(email, password);
 			
-			if (success) {
-				dispatch('success', { user: userActions });
-				dispatch('close');
-			} else {
-				error = 'Invalid email or password. Please try again.';
-			}
+			dispatch('success', { user: userActions });
+			dispatch('close');
 		} catch (err: any) {
 			console.error('Login error:', err);
 			error = err.message || 'Login failed. Please try again.';
@@ -53,14 +51,11 @@
 			await client.auth.register({ username, email, password });
 			
 			// Then automatically log them in
-			const success = await userActions.login(email, password);
-			
-			if (success) {
-				dispatch('success', { user: userActions });
-				dispatch('close');
-			} else {
-				error = 'Registration successful, but login failed. Please try logging in manually.';
-			}
+			await userActions.login(email, password);
+
+			// On success, dispatch events to close modal and notify parent
+			dispatch('success', { user: userActions });
+			dispatch('close');
 		} catch (err: any) {
 			console.error('Registration error:', err);
 			if (err.message.includes('already exists')) {
