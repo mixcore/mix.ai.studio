@@ -5,16 +5,27 @@
 	export let loading = false;
 	export let error = '';
 	
-	let usernameOrEmail = '';
+	function getInitialLoginType(): 'email' | 'username' {
+		const preferred = localStorage.getItem('preferredLoginType');
+		if (preferred === 'email' || preferred === 'username') {
+			return preferred;
+		}
+		return 'email'; // Default value
+	}
+	
+	let loginType = getInitialLoginType();
+	let email = '';
+	let username = '';
 	let password = '';
 	let showPassword = false;
-	let usernameOrEmailError = '';
+	let emailError = '';
+	let usernameError = '';
 	let passwordError = '';
 	
 	const dispatch = createEventDispatcher<{
-		login: { usernameOrEmail: string; password: string };
+		login: { email: string; password: string };
 		register: void;
-		forgotPassword: { usernameOrEmail: string };
+		forgotPassword: { email: string };
 	}>();
 	
 	function validateEmail(email: string): boolean {
@@ -22,66 +33,70 @@
 		return emailRegex.test(email);
 	}
 	
-	function isEmailFormat(input: string): boolean {
-		return input.includes('@');
+	function validateIdentifier(): boolean {
+		emailError = '';
+		usernameError = '';
+		
+		if (loginType === 'email') {
+			if (!email) {
+				emailError = 'Email is required';
+				return false;
+			} else if (!validateEmail(email)) {
+				emailError = 'Please enter a valid email address';
+				return false;
+			}
+		} else {
+			if (!username) {
+				usernameError = 'Username is required';
+				return false;
+			} else if (username.length < 3) {
+				usernameError = 'Username must be at least 3 characters';
+				return false;
+			} else if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+				usernameError = 'Username can only contain letters, numbers, underscores, dots, and hyphens';
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	function validateForm(): boolean {
-		usernameOrEmailError = '';
 		passwordError = '';
+		const isIdentifierValid = validateIdentifier();
 		
-		if (!usernameOrEmail) {
-			usernameOrEmailError = 'Username or email is required';
-			return false;
-		}
-		
-		// If it looks like an email, validate email format
-		if (isEmailFormat(usernameOrEmail) && !validateEmail(usernameOrEmail)) {
-			usernameOrEmailError = 'Please enter a valid email address';
-			return false;
-		}
-		
-		// If it's not an email, validate as username
-		if (!isEmailFormat(usernameOrEmail)) {
-			if (usernameOrEmail.length < 3) {
-				usernameOrEmailError = 'Username must be at least 3 characters';
-				return false;
-			}
-			if (!/^[a-zA-Z0-9_.-]+$/.test(usernameOrEmail)) {
-				usernameOrEmailError = 'Username can only contain letters, numbers, underscores, dots, and hyphens';
-				return false;
-			}
-		}
-		
+		let isPasswordValid = true;
 		if (!password) {
 			passwordError = 'Password is required';
-			return false;
-		}
-		
-		if (password.length < 6) {
+			isPasswordValid = false;
+		} else if (password.length < 6) {
 			passwordError = 'Password must be at least 6 characters';
-			return false;
+			isPasswordValid = false;
 		}
 		
-		return true;
+		return isIdentifierValid && isPasswordValid;
 	}
 	
 	function handleSubmit() {
 		if (validateForm() && !loading) {
-			dispatch('login', { usernameOrEmail, password });
+			const identifier = loginType === 'email' ? email : username;
+			dispatch('login', { email: identifier, password });
 		}
 	}
 	
 	function handleForgotPassword() {
-		if (usernameOrEmail && validateEmail(usernameOrEmail)) {
-			dispatch('forgotPassword', { usernameOrEmail });
-		} else {
-			usernameOrEmailError = 'Please enter a valid email address';
+		if (validateIdentifier()) {
+			const identifier = loginType === 'email' ? email : username;
+			dispatch('forgotPassword', { email: identifier });
 		}
 	}
 	
 	function togglePasswordVisibility() {
 		showPassword = !showPassword;
+	}
+
+	function setLoginType(type: 'email' | 'username') {
+		loginType = type;
+		localStorage.setItem('preferredLoginType', type);
 	}
 </script>
 
@@ -106,32 +121,79 @@
 			
 			<!-- Form -->
 			<form on:submit|preventDefault={handleSubmit} class="space-y-4">
-				<!-- Email Input -->
-				<div class="form-control">
-					<label class="label" for="email">
-						<span class="label-text font-medium">Username or Email</span>
-					</label>
-					<div class="relative">
-						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-							<Mail class="w-5 h-5 text-base-content/40" />
-						</div>
-						<input
-							id="email"
-							type="email"
-                bind:value={usernameOrEmail}
-							placeholder="Enter your username or email"
-							class="input input-bordered w-full pl-10"
-							class:input-error={usernameOrEmailError}
+				<!-- Login Type Toggle -->
+				<div class="flex justify-center mb-4">
+					<div class="btn-group">
+						<button
+							class="btn btn-sm {loginType === 'email' ? 'btn-primary' : 'btn-ghost'}"
+							on:click={() => setLoginType('email')}
 							disabled={loading}
-							autocomplete="email"
-						/>
+						>
+							<Mail class="w-4 h-4 mr-2" />
+							Email Login
+						</button>
+						<button class="btn btn-sm {loginType === 'username' ? 'btn-primary' : 'btn-ghost'}" on:click={() => setLoginType('username')} disabled={loading}>
+							<User class="w-4 h-4 mr-2" />
+							Username Login
+						</button>
 					</div>
-					{#if usernameOrEmailError}
-						<label class="label">
-							<span class="label-text-alt text-error">{usernameOrEmailError}</span>
-						</label>
-					{/if}
 				</div>
+
+				{#if loginType === 'email'}
+					<!-- Email Input -->
+					<div class="form-control">
+						<label class="label" for="email">
+							<span class="label-text font-medium">Email</span>
+						</label>
+						<div class="relative">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<Mail class="w-5 h-5 text-base-content/40" />
+							</div>
+							<input
+								id="email"
+								type="email"
+								bind:value={email}
+								placeholder="Enter your email"
+								class="input input-bordered w-full pl-10"
+								class:input-error={emailError}
+								disabled={loading}
+								autocomplete="email"
+							/>
+						</div>
+						{#if emailError}
+							<label class="label">
+								<span class="label-text-alt text-error">{emailError}</span>
+							</label>
+						{/if}
+					</div>
+				{:else}
+					<!-- Username Input -->
+					<div class="form-control">
+						<label class="label" for="username">
+							<span class="label-text font-medium">Username</span>
+						</label>
+						<div class="relative">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<User class="w-5 h-5 text-base-content/40" />
+							</div>
+							<input
+								id="username"
+								type="text"
+								bind:value={username}
+								placeholder="Enter your username"
+								class="input input-bordered w-full pl-10"
+								class:input-error={usernameError}
+								disabled={loading}
+								autocomplete="username"
+							/>
+						</div>
+						{#if usernameError}
+							<label class="label">
+								<span class="label-text-alt text-error">{usernameError}</span>
+							</label>
+						{/if}
+					</div>
+				{/if}
 				
 				<!-- Password Input -->
 				<div class="form-control">

@@ -43,7 +43,7 @@
 			</div>
 			
 			<h1 class="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-				Mix Portal Einstein
+				Mix AI Portal
 			</h1>
 			
 			<p class="text-xl md:text-2xl text-base-content/70 mb-8 max-w-3xl mx-auto">

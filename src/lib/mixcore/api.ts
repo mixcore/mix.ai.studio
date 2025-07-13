@@ -9,6 +9,7 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
+  isRetry?: boolean; // Flag to prevent infinite retry loops
 }
 
 export interface ApiResponse<T = any> {
@@ -19,19 +20,26 @@ export interface ApiResponse<T = any> {
 }
 
 export class ApiClient {
+  private onAuthFailure?: () => Promise<boolean>;
+
   constructor(
     private baseURL: string,
     private getAuthToken: () => string | null
   ) {}
 
+  public setAuthFailureHandler(handler: () => Promise<boolean>): void {
+    this.onAuthFailure = handler;
+  }
+
   private async makeRequest<T>(
     endpoint: string, 
     config: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+    // Robustly join URL parts to prevent double slashes
+    const url = `${this.baseURL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
     
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json-patch+json',
       ...config.headers
     };
 
@@ -80,7 +88,17 @@ export class ApiClient {
 
       // Handle HTTP errors
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        // If we get a 401, try to refresh the token and retry the request once.
+        if (response.status === 401 && !config.isRetry && this.onAuthFailure) {
+          const refreshed = await this.onAuthFailure();
+          if (refreshed) {
+            console.log('Retrying original request...');
+            return this.makeRequest(endpoint, { ...config, isRetry: true });
+          }
+        }
+
+        // Handle other errors or if refresh fails
+        if (response.status === 401 || response.status === 403) { 
           throw new AuthenticationError('Authentication failed');
         } else if (response.status >= 500) {
           throw new NetworkError(`Server error: ${response.statusText}`, response.status);
@@ -154,8 +172,11 @@ export class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { method: 'DELETE' });
+  async delete<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.makeRequest<T>(endpoint, {
+      method: 'DELETE',
+      body: data
+    });
   }
 
   // File upload method
