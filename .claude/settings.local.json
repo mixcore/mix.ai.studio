@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx sv create:*)",
+      "Bash(rm:*)",
+      "Bash(bun install:*)",
+      "Bash(bun add:*)",
+      "Bash(bunx tailwindcss init:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(mkdir:*)",
+      "Bash(bun run:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": []
+  }
+}
