@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { MessageSquare, Bot, Image, MoreHorizontal } from 'lucide-svelte';
-	import { chatMessages, chatLoading, chatInput, chatMode } from '$lib/stores';
+	import { Bot } from 'lucide-svelte';
+	import { chatMessages, chatLoading } from '$lib/stores';
 	import ChatMessage from './ChatMessage.svelte';
 	import ChatInput from './ChatInput.svelte';
-	import ModeSelector from './ModeSelector.svelte';
 
 	let chatContainer: HTMLDivElement;
 
@@ -15,15 +14,6 @@
 </script>
 
 <div class="flex flex-col h-full bg-base-100">
-	<!-- Chat Header -->
-	<div class="flex items-center justify-between p-4 border-b border-base-300">
-		<div class="flex items-center gap-2">
-			<Bot class="w-5 h-5 text-primary" />
-			<span class="font-medium text-sm">AI Assistant</span>
-		</div>
-		<ModeSelector />
-	</div>
-
 	<!-- Chat Messages -->
 	<div 
 		bind:this={chatContainer}

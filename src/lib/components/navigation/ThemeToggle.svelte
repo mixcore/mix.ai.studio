@@ -3,11 +3,11 @@
 	import { onMount } from 'svelte';
 
 	let isDark = true;
-	let currentTheme = 'black';
+	let currentTheme = 'dark';
 
 	function toggleTheme() {
 		const html = document.documentElement;
-		const newTheme = currentTheme === 'light' ? 'black' : 'light';
+		const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 		
 		console.log('Toggling theme from', currentTheme, 'to', newTheme);
 		
@@ -17,7 +17,7 @@
 		// Add the new theme
 		html.setAttribute('data-theme', newTheme);
 		currentTheme = newTheme;
-		isDark = newTheme === 'black';
+		isDark = newTheme === 'dark';
 		
 		// Store preference
 		localStorage.setItem('preferred-theme', newTheme);
@@ -31,15 +31,15 @@
 		const storedTheme = localStorage.getItem('preferred-theme');
 		const html = document.documentElement;
 		
-		if (storedTheme && (storedTheme === 'black' || storedTheme === 'light')) {
+		if (storedTheme && (storedTheme === 'dark' || storedTheme === 'light')) {
 			currentTheme = storedTheme;
 			html.setAttribute('data-theme', storedTheme);
-			isDark = storedTheme === 'black';
+			isDark = storedTheme === 'dark';
 		} else {
-			currentTheme = 'black';
-			html.setAttribute('data-theme', 'black');
+			currentTheme = 'dark';
+			html.setAttribute('data-theme', 'dark');
 			isDark = true;
-			localStorage.setItem('preferred-theme', 'black');
+			localStorage.setItem('preferred-theme', 'dark');
 		}
 	});
 </script>
