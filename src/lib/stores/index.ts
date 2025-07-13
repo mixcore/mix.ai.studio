@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { Workspace } from '$lib/types';
 import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/services/mixcore';
 
@@ -10,6 +10,22 @@ export const chatMessages = writable<ChatMessage[]>([]);
 export const chatLoading = writable(false);
 export const chatMode = writable<'default' | 'chat-only' | 'agent'>('default');
 export const chatInput = writable('');
+
+// New type for LLM Model
+export type LLMModel = {
+	id: string;
+	name: string;
+	provider: 'OpenAI' | 'Anthropic' | 'Google' | 'Groq' | 'DeepSeek' | 'Mistral';
+};
+
+// List of available models
+export const availableModels: LLMModel[] = [
+	{ id: 'gpt-4o', name: 'ChatGPT 4o', provider: 'OpenAI' },
+	{ id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },
+	{ id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
+	{ id: 'llama3-8b', name: 'LLaMA3 8B', provider: 'Groq' }
+];
+export const selectedModel = writable<LLMModel>(availableModels[0]);
 
 export const previewUrl = writable('');
 export const previewLoading = writable(false);
@@ -174,10 +190,12 @@ export const chatActions = {
       chatLoading.set(true);
       
       const currentProjectId = getCurrentProjectId();
+      const currentModel = get(selectedModel);
       const message = await mixcoreService.createChatMessage({
         content,
         role,
-        projectId: currentProjectId
+        projectId: currentProjectId,
+        metadata: { model: currentModel.id }
       });
       
       if (message) {
@@ -213,9 +231,5 @@ export const chatActions = {
 
 // Helper function to get current project ID
 function getCurrentProjectId(): string | undefined {
-  let projectId: string | undefined;
-  currentProject.subscribe(project => {
-    projectId = project?.id;
-  })();
-  return projectId;
+  return get(currentProject)?.id;
 }

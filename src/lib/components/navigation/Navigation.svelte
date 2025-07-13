@@ -1,7 +1,37 @@
 <script lang="ts">
-	import { Github, Database, Users, ExternalLink, RefreshCw, Globe, Monitor, Smartphone, Tablet, ChevronDown, FolderOpen, Settings, FileText, Share, Bot, MessageSquare } from 'lucide-svelte';
+	import {
+		Github,
+		Database,
+		Users,
+		ExternalLink,
+		RefreshCw,
+		Globe,
+		Monitor,
+		Smartphone,
+		Tablet,
+		ChevronDown,
+		FolderOpen,
+		Settings,
+		FileText,
+		Share,
+		Bot,
+		MessageSquare,
+		BrainCircuit
+	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
-	import { showInviteModal, previewUrl, previewLoading, deviceMode, chatMode, projectActions, currentProject, projects, isAuthenticated } from '$lib/stores';
+	import {
+		showInviteModal,
+		previewUrl,
+		previewLoading,
+		deviceMode,
+		chatMode,
+		projectActions,
+		currentProject,
+		projects,
+		isAuthenticated,
+		availableModels,
+		selectedModel
+	} from '$lib/stores';
 	import UserMenu from './UserMenu.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import ChatToggle from './ChatToggle.svelte';
@@ -93,7 +123,7 @@
 			<div tabindex="0" role="button" class="flex items-center gap-2 btn btn-ghost btn-sm">
 				<div class="w-6 h-6 bg-gradient-to-br from-primary to-secondary rounded"></div>
 				<span class="font-semibold text-sm">{$currentProject?.name || projectName}</span>
-				<ChevronDown class="w-3 h-3" />
+				<ChevronDown class="w-4 h-4" />
 			</div>
 			<ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300">
 				<li class="menu-title">
@@ -154,6 +184,25 @@
 						Agent Mode
 					</button>
 				</li>
+				<div class="divider my-1"></div>
+				<li class="menu-title">
+					<span class="flex items-center gap-2">
+						<BrainCircuit class="w-4 h-4" />
+						<span>Model</span>
+					</span>
+				</li>
+				{#each availableModels as model}
+					<li>
+						<button
+							class="flex justify-between w-full"
+							class:active={$selectedModel.id === model.id}
+							on:click={() => selectedModel.set(model)}
+						>
+							<span>{model.name}</span>
+							<span class="badge badge-ghost badge-sm">{model.provider}</span>
+						</button>
+					</li>
+				{/each}
 				<div class="divider my-1"></div>
 				<li>
 					<button class="flex items-center gap-2">
@@ -223,7 +272,7 @@
 
 			<!-- URL Bar -->
 			<div class="flex items-center gap-1 bg-base-200 rounded-md px-2 py-1 text-xs">
-				<Globe class="w-3 h-3 text-base-content/60" />
+				<Globe class="w-4 h-4 text-base-content/60" />
 				<span class="text-base-content/70">{$previewUrl}</span>
 			</div>
 		</div>
@@ -237,7 +286,7 @@
 	class="btn btn-ghost btn-sm"
 				on:click={() => showInviteModal.set(true)}
 			>
-				<Users class="w-3 h-3" />
+				<Users class="w-4 h-4" />
 			
 			</button>
 
@@ -245,7 +294,7 @@
 	class="btn btn-ghost btn-sm"
 				title="Mix Database"
 			>
-				<Database class="w-3 h-3" />
+				<Database class="w-4 h-4" />
 				
 			</button>
 
@@ -254,7 +303,7 @@
 				title="Refresh Data"
 				aria-label="Refresh Data"
 			>
-				<Github class="w-3 h-3" />
+				<Github class="w-4 h-4" />
 				
 			</button>
 
