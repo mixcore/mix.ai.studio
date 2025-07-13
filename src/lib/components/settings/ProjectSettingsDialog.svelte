@@ -64,7 +64,7 @@
 	};
 </script>
 
-<dialog class="modal" class:modal-open={open}>
+<dialog class="modal backdrop-blur-sm" class:modal-open={open}>
 	<div class="modal-box w-full max-w-6xl h-[80vh] p-0 flex overflow-hidden">
 		<!-- Mobile header -->
 		<div class="md:hidden absolute top-0 left-0 right-0 bg-base-100 border-b border-base-200/60 p-4 flex items-center justify-between z-10">
@@ -314,7 +314,7 @@
 			</div>
 		</div>
 	
-	<form method="dialog" class="modal-backdrop">
+	<form method="dialog" class="modal-backdrop backdrop-blur-sm bg-black/30">
 		<button on:click={closeDialog}>close</button>
 	</form>
 </dialog>
