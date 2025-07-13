@@ -64,7 +64,7 @@
 	<!-- Main Application -->
 	<div class="h-screen flex flex-col">
 		<!-- Navigation -->
-		<Navigation projectName="My Awesome App" />
+		<Navigation projectName="mixcore.ai" />
 		
 		<!-- Main Content -->
 		<div class="flex-1 overflow-hidden">
