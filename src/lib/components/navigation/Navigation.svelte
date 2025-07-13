@@ -35,8 +35,11 @@
 	import UserMenu from './UserMenu.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import ChatToggle from './ChatToggle.svelte';
+	import ProjectSettingsDialog from '../settings/ProjectSettingsDialog.svelte';
 
 	export let projectName = 'Untitled Project';
+
+	let showProjectSettings = false;
 
 
 	function refreshPreview() {
@@ -205,7 +208,7 @@
 				{/each}
 				<div class="divider my-1"></div>
 				<li>
-					<button class="flex items-center gap-2">
+					<button class="flex items-center gap-2" on:click={() => showProjectSettings = true}>
 						<Settings class="w-4 h-4" />
 						Project Settings
 					</button>
@@ -318,3 +321,9 @@
 		</div>
 	</div>
 </nav>
+
+<!-- Project Settings Dialog -->
+<ProjectSettingsDialog 
+	bind:open={showProjectSettings}
+	on:close={() => showProjectSettings = false}
+/>
