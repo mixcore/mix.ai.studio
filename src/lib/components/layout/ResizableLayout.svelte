@@ -9,7 +9,7 @@
 	let resizer: HTMLDivElement;
 	
 	let isResizing = false;
-	let leftPanelWidth = 37.4; // Default width percentage
+	let leftPanelWidth = 30; // Default width percentage
 
 	function startResize(e: MouseEvent) {
 		isResizing = true;
