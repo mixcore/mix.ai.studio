@@ -17,3 +17,5 @@ export const showCodeView = writable(false);
 export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
 export const showPublishModal = writable(false);
+export const showChatPanel = writable(true);
+export const deviceMode = writable<'desktop' | 'tablet' | 'mobile'>('desktop');

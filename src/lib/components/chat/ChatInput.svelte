@@ -56,18 +56,18 @@
 	}
 </script>
 
-<div class="space-y-3">
+<div class="space-y-4">
 	<!-- Mode Toggle -->
 	<div class="flex items-center gap-2 text-xs">
-		<button class="flex items-center gap-1 px-2 py-1 bg-accent-primary text-white rounded-md">
+		<button class="btn btn-primary btn-sm">
 			<MessageSquare class="w-3 h-3" />
 			Default
 		</button>
-		<button class="flex items-center gap-1 px-2 py-1 text-muted-foreground hover:bg-accent rounded-md transition-colors">
+		<button class="btn btn-ghost btn-sm">
 			<MessageSquare class="w-3 h-3" />
 			Chat only
 		</button>
-		<button class="flex items-center gap-1 px-2 py-1 text-muted-foreground hover:bg-accent rounded-md transition-colors">
+		<button class="btn btn-ghost btn-sm">
 			<Eye class="w-3 h-3" />
 			Visual editor
 		</button>
@@ -80,10 +80,10 @@
 			bind:value={$chatInput}
 			placeholder="Ask Lovable to build your app..."
 			class={cn(
-				"w-full min-h-[60px] max-h-[200px] p-3 pr-20 text-sm",
-				"bg-white border border-gray-200 rounded-lg resize-none",
-				"focus:outline-none focus:ring-2 focus:ring-blue-500",
-				"placeholder:text-gray-500"
+				"w-full min-h-[60px] max-h-[200px] p-4 pr-20 text-sm",
+				"textarea textarea-bordered w-full resize-none",
+				"focus:textarea-primary",
+				"placeholder:text-base-content/50"
 			)}
 			on:keydown={handleKeyDown}
 			on:input={autoResize}
@@ -93,7 +93,7 @@
 		<!-- Input Controls -->
 		<div class="absolute right-2 bottom-2 flex items-center gap-1">
 			<button
-				class="p-2 hover:bg-accent rounded-md transition-colors"
+				class="btn btn-ghost btn-sm"
 				on:click={handleImageUpload}
 				title="Attach image"
 			>
@@ -102,10 +102,10 @@
 
 			<button
 				class={cn(
-					"p-2 rounded-md transition-colors",
+					"btn btn-sm",
 					$chatInput.trim() && !$chatLoading
-						? "bg-accent-primary text-white hover:bg-blue-700"
-						: "text-muted-foreground cursor-not-allowed"
+						? "btn-primary"
+						: "btn-disabled"
 				)}
 				on:click={handleSubmit}
 				disabled={!$chatInput.trim() || $chatLoading}

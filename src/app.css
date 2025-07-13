@@ -1,47 +1,44 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-:root {
-  --background: 255 255 255;
-  --foreground: 15 23 42;
-  --card: 255 255 255;
-  --card-foreground: 15 23 42;
-  --popover: 255 255 255;
-  --popover-foreground: 15 23 42;
-  --primary: 59 130 246;
-  --primary-foreground: 255 255 255;
-  --secondary: 241 245 249;
-  --secondary-foreground: 15 23 42;
-  --muted: 241 245 249;
-  --muted-foreground: 100 116 139;
-  --accent: 241 245 249;
-  --accent-foreground: 15 23 42;
-  --destructive: 239 68 68;
-  --destructive-foreground: 255 255 255;
-  --border: 226 232 240;
-  --input: 226 232 240;
-  --ring: 59 130 246;
+
+@plugin "daisyui" {
+  themes: all;
 }
 
-.dark {
-  --background: 15 23 42;
-  --foreground: 248 250 252;
-  --card: 15 23 42;
-  --card-foreground: 248 250 252;
-  --popover: 15 23 42;
-  --popover-foreground: 248 250 252;
-  --primary: 99 102 241;
-  --primary-foreground: 15 23 42;
-  --secondary: 30 41 59;
-  --secondary-foreground: 248 250 252;
-  --muted: 30 41 59;
-  --muted-foreground: 148 163 184;
-  --accent: 30 41 59;
-  --accent-foreground: 248 250 252;
-  --destructive: 220 38 38;
-  --destructive-foreground: 248 250 252;
-  --border: 30 41 59;
-  --input: 30 41 59;
-  --ring: 99 102 241;
+/* Consistent spacing utilities for Lovable-inspired design */
+@layer utilities {
+  /* Panel header standardization */
+  .panel-header {
+    @apply p-4 border-b border-base-300;
+  }
+
+  /* Content area standardization */
+  .panel-content {
+    @apply p-4;
+  }
+
+  /* Button group standardization */
+  .button-group {
+    @apply flex items-center gap-2;
+  }
+
+  /* Message spacing standardization */
+  .message-spacing {
+    @apply space-y-4;
+  }
+
+  /* Standard gap hierarchy */
+  .gap-standard {
+    @apply gap-2; /* 8px - for most UI elements */
+  }
+  
+  .gap-content {
+    @apply gap-4; /* 16px - for major content sections */
+  }
+  
+  .gap-tight {
+    @apply gap-1; /* 4px - for closely related elements */
+  }
 }
 
 html, body {
@@ -49,6 +46,4 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  background-color: rgb(var(--background));
-  color: rgb(var(--foreground));
 }

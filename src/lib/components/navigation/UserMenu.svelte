@@ -1,60 +1,21 @@
 <script lang="ts">
 	import { User, Settings, LogOut } from 'lucide-svelte';
 	import { user } from '$lib/stores';
-
-	let showDropdown = false;
-
-	function toggleDropdown() {
-		showDropdown = !showDropdown;
-	}
-
-	function closeDropdown() {
-		showDropdown = false;
-	}
 </script>
 
-<div class="relative">
-	<button 
-		class="w-8 h-8 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-medium hover:bg-blue-700 transition-colors"
-		on:click={toggleDropdown}
-	>
-		{$user?.name?.[0] || 'U'}
-	</button>
-
-	{#if showDropdown}
-		<div 
-			class="absolute right-0 top-10 w-48 bg-popover border border-border rounded-md shadow-lg z-50"
-			on:click={closeDropdown}
-			on:keydown={closeDropdown}
-		>
-			<div class="p-2 border-b border-border">
-				<div class="text-sm font-medium">{$user?.name || 'User'}</div>
-				<div class="text-xs text-muted-foreground">{$user?.email || 'user@example.com'}</div>
-			</div>
-			
-			<div class="p-1">
-				<button class="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent rounded-sm">
-					<User class="w-4 h-4" />
-					Profile
-				</button>
-				<button class="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent rounded-sm">
-					<Settings class="w-4 h-4" />
-					Settings
-				</button>
-				<button class="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent rounded-sm text-destructive">
-					<LogOut class="w-4 h-4" />
-					Sign out
-				</button>
-			</div>
+<div class="dropdown dropdown-end">
+	<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+		<div class="w-8 rounded-full bg-primary text-primary-content flex items-center justify-center text-sm font-medium">
+			{$user?.name?.[0] || 'U'}
 		</div>
-	{/if}
+	</div>
+	<ul tabindex="0" class="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52">
+		<li class="menu-title">
+			<span class="text-sm font-medium">{$user?.name || 'User'}</span>
+			<span class="text-xs opacity-60">{$user?.email || 'user@example.com'}</span>
+		</li>
+		<li><a><User class="w-4 h-4" />Profile</a></li>
+		<li><a><Settings class="w-4 h-4" />Settings</a></li>
+		<li><a class="text-error"><LogOut class="w-4 h-4" />Sign out</a></li>
+	</ul>
 </div>
-
-<!-- Click outside to close -->
-{#if showDropdown}
-	<div 
-		class="fixed inset-0 z-40" 
-		on:click={closeDropdown}
-		on:keydown={closeDropdown}
-	></div>
-{/if}

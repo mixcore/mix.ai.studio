@@ -12,19 +12,19 @@
 
 <div class="relative">
 	<button 
-		class="p-1.5 hover:bg-accent rounded-md transition-colors"
+		class="btn btn-ghost btn-sm"
 		on:click={() => showDropdown = !showDropdown}
 	>
 		<MoreHorizontal class="w-4 h-4" />
 	</button>
 
 	{#if showDropdown}
-		<div class="absolute right-0 top-8 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
-			<div class="p-1">
-				<div class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Chat Mode</div>
+		<div class="absolute right-0 top-8 w-48 bg-base-100 border border-base-300 rounded-md shadow-lg z-50">
+			<div class="p-2">
+				<div class="px-2 py-1.5 text-xs font-medium text-base-content/60">Chat Mode</div>
 				
 				<button 
-					class="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded-sm"
+					class="w-full text-left px-2 py-1.5 text-sm hover:bg-base-200 rounded-sm"
 					class:bg-accent={$chatMode === 'default'}
 					on:click={() => selectMode('default')}
 				>
@@ -32,7 +32,7 @@
 				</button>
 				
 				<button 
-					class="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded-sm"
+					class="w-full text-left px-2 py-1.5 text-sm hover:bg-base-200 rounded-sm"
 					class:bg-accent={$chatMode === 'chat-only'}
 					on:click={() => selectMode('chat-only')}
 				>
@@ -40,7 +40,7 @@
 				</button>
 				
 				<button 
-					class="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded-sm"
+					class="w-full text-left px-2 py-1.5 text-sm hover:bg-base-200 rounded-sm"
 					class:bg-accent={$chatMode === 'agent'}
 					on:click={() => selectMode('agent')}
 				>

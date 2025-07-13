@@ -3,6 +3,7 @@
 	import ResizableLayout from '$lib/components/layout/ResizableLayout.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import PreviewPanel from '$lib/components/preview/PreviewPanel.svelte';
+	import FloatingChatToggle from '$lib/components/navigation/FloatingChatToggle.svelte';
 	import { onMount } from 'svelte';
 	import { user, previewUrl } from '$lib/stores';
 
@@ -30,4 +31,7 @@
 			<PreviewPanel slot="right" />
 		</ResizableLayout>
 	</div>
+
+	<!-- Floating Chat Toggle (appears when chat is hidden) -->
+	<FloatingChatToggle />
 </div>

@@ -14,11 +14,11 @@
 	}
 </script>
 
-<div class="flex flex-col h-full bg-background">
+<div class="flex flex-col h-full bg-base-100">
 	<!-- Chat Header -->
-	<div class="flex items-center justify-between p-4 border-b border-border">
+	<div class="flex items-center justify-between p-4 border-b border-base-300">
 		<div class="flex items-center gap-2">
-			<Bot class="w-5 h-5 text-accent-primary" />
+			<Bot class="w-5 h-5 text-primary" />
 			<span class="font-medium text-sm">AI Assistant</span>
 		</div>
 		<ModeSelector />
@@ -31,9 +31,9 @@
 	>
 		{#if $chatMessages.length === 0}
 			<div class="flex flex-col items-center justify-center h-full text-center">
-				<Bot class="w-12 h-12 text-muted-foreground mb-4" />
+				<Bot class="w-12 h-12 text-base-content/60 mb-4" />
 				<h3 class="text-lg font-medium mb-2">Welcome to your AI assistant</h3>
-				<p class="text-sm text-muted-foreground max-w-sm">
+				<p class="text-sm text-base-content/60 max-w-sm">
 					Describe what you want to build and I'll help you create it step by step.
 				</p>
 			</div>
@@ -44,9 +44,9 @@
 		{/if}
 		
 		{#if $chatLoading}
-			<div class="flex items-center gap-2 text-muted-foreground">
+			<div class="flex items-center gap-2 text-base-content/60">
 				<div class="flex space-x-1">
-					<div class="w-2 h-2 bg-accent-primary rounded-full animate-bounce"></div>
+					<div class="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
 					<div class="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
 					<div class="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
 				</div>
@@ -56,7 +56,7 @@
 	</div>
 
 	<!-- Chat Input -->
-	<div class="p-4 border-t border-border">
+	<div class="p-4 border-t border-base-300">
 		<ChatInput />
 	</div>
 </div>

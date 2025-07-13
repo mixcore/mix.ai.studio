@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { cn } from '$lib/utils';
+	import { showChatPanel } from '$lib/stores';
 
 	let container: HTMLDivElement;
 	let leftPanel: HTMLDivElement;
@@ -43,34 +44,36 @@
 
 <div 
 	bind:this={container}
-	class="flex h-full bg-background"
+	class="flex h-full bg-base-100"
 >
 	<!-- Left Panel (Chat) -->
-	<div 
-		bind:this={leftPanel}
-		class="flex flex-col border-r border-border"
-		style="width: {leftPanelWidth}%"
-	>
-		<slot name="left" />
-	</div>
+	{#if $showChatPanel}
+		<div 
+			bind:this={leftPanel}
+			class="flex flex-col border-r border-base-300 transition-all duration-300"
+			style="width: {leftPanelWidth}%"
+		>
+			<slot name="left" />
+		</div>
 
-	<!-- Resizer -->
-	<div 
-		bind:this={resizer}
-		class={cn(
-			"w-1 bg-border hover:bg-accent-primary cursor-col-resize transition-colors",
-			isResizing && "bg-accent-primary"
-		)}
-		on:mousedown={startResize}
-		role="separator"
-		aria-label="Resize panels"
-	></div>
+		<!-- Resizer -->
+		<div 
+			bind:this={resizer}
+			class={cn(
+				"w-1 bg-base-300 hover:bg-primary cursor-col-resize transition-colors",
+				isResizing && "bg-primary"
+			)}
+			on:mousedown={startResize}
+			role="separator"
+			aria-label="Resize panels"
+		></div>
+	{/if}
 
 	<!-- Right Panel (Preview) -->
 	<div 
 		bind:this={rightPanel}
-		class="flex flex-col flex-1"
-		style="width: {100 - leftPanelWidth}%"
+		class="flex flex-col flex-1 transition-all duration-300"
+		style="width: {$showChatPanel ? 100 - leftPanelWidth : 100}%"
 	>
 		<slot name="right" />
 	</div>
