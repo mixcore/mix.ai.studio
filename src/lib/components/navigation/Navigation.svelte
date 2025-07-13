@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Github, Database, Users, ExternalLink, RefreshCw, Globe, Monitor, Smartphone, Tablet, ChevronDown, FolderOpen, Settings, FileText, Share, Bot, MessageSquare } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
-	import { showInviteModal, previewUrl, previewLoading, deviceMode, chatMode } from '$lib/stores';
+	import { showInviteModal, previewUrl, previewLoading, deviceMode, chatMode, projectActions, currentProject, projects, isAuthenticated } from '$lib/stores';
 	import UserMenu from './UserMenu.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import ChatToggle from './ChatToggle.svelte';
@@ -29,6 +29,60 @@
 	function setChatMode(mode: 'default' | 'chat-only' | 'agent') {
 		chatMode.set(mode);
 	}
+
+	async function handleCreateProject() {
+		if (!$isAuthenticated) {
+			alert('Please sign in to create projects');
+			return;
+		}
+		
+		const projectName = prompt('Enter project name:');
+		if (projectName) {
+			try {
+				await projectActions.createProject({ 
+					name: projectName,
+					description: 'Created from Mix Portal Einstein'
+				});
+			} catch (error) {
+				console.error('Failed to create project:', error);
+				alert('Failed to create project. Please try again.');
+			}
+		}
+	}
+
+	async function handleOpenProject() {
+		if (!$isAuthenticated) {
+			alert('Please sign in to access projects');
+			return;
+		}
+		
+		try {
+			const projectList = await projectActions.loadProjects();
+			if (projectList.length === 0) {
+				alert('No projects found. Create your first project!');
+			} else {
+				console.log('Loaded projects:', projectList);
+			}
+		} catch (error) {
+			console.error('Failed to load projects:', error);
+			alert('Failed to load projects. Please try again.');
+		}
+	}
+
+	async function handleExportProject() {
+		if (!$isAuthenticated) {
+			alert('Please sign in to export projects');
+			return;
+		}
+		
+		if ($currentProject) {
+			// Implement project export functionality
+			console.log('Exporting project:', $currentProject.name);
+			alert(`Exporting project: ${$currentProject.name}`);
+		} else {
+			alert('No project selected');
+		}
+	}
 </script>
 
 <nav class="navbar bg-base-100 border-b border-base-300 h-12 min-h-12 px-4">
@@ -38,7 +92,7 @@
 		<div class="dropdown dropdown-hover">
 			<div tabindex="0" role="button" class="flex items-center gap-2 btn btn-ghost btn-sm">
 				<div class="w-6 h-6 bg-gradient-to-br from-primary to-secondary rounded"></div>
-				<span class="font-semibold text-sm">{projectName}</span>
+				<span class="font-semibold text-sm">{$currentProject?.name || projectName}</span>
 				<ChevronDown class="w-3 h-3" />
 			</div>
 			<ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300">
@@ -46,19 +100,19 @@
 					<span class="text-sm font-medium">Project</span>
 				</li>
 				<li>
-					<button class="flex items-center gap-2">
+					<button class="flex items-center gap-2" on:click={handleOpenProject}>
 						<FolderOpen class="w-4 h-4" />
 						Open Project
 					</button>
 				</li>
 				<li>
-					<button class="flex items-center gap-2">
+					<button class="flex items-center gap-2" on:click={handleCreateProject}>
 						<FileText class="w-4 h-4" />
 						New Project
 					</button>
 				</li>
 				<li>
-					<button class="flex items-center gap-2">
+					<button class="flex items-center gap-2" on:click={handleExportProject}>
 						<Share class="w-4 h-4" />
 						Export Project
 					</button>

@@ -11,7 +11,9 @@
       "Bash(bun run:*)",
       "Bash(curl:*)",
       "WebFetch(domain:daisyui.com)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": []
   }
