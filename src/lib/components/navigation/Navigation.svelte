@@ -27,15 +27,16 @@
 		chatMode,
 		projectActions,
 		currentProject,
-		projects,
 		isAuthenticated,
 		availableModels,
-		selectedModel
+		selectedModel,
+		viewMode
 	} from '$lib/stores';
 	import UserMenu from './UserMenu.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import ChatToggle from './ChatToggle.svelte';
 	import ProjectSettingsDialog from '../settings/ProjectSettingsDialog.svelte';
+	import ConnectionStatus from '../status/ConnectionStatus.svelte';
 
 	export let projectName = 'Untitled Project';
 
@@ -116,6 +117,10 @@
 			alert('No project selected');
 		}
 	}
+
+	function toggleViewMode() {
+		viewMode.update(mode => mode === 'preview' ? 'database' : 'preview');
+	}
 </script>
 
 <nav class="navbar bg-base-100 border-b border-base-300 h-12 min-h-12 px-4">
@@ -128,7 +133,7 @@
 				<span class="font-semibold text-sm">{$currentProject?.name || projectName}</span>
 				<ChevronDown class="w-4 h-4" />
 			</div>
-			<ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300">
+			<ul class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300">
 				<li class="menu-title">
 					<span class="text-sm font-medium">Project</span>
 				</li>
@@ -294,11 +299,21 @@
 			</button>
 
 			<button 
-	class="btn btn-ghost btn-sm"
-				title="Mix Database"
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'database'}
+				on:click={toggleViewMode}
+				title={$viewMode === 'database' ? 'Switch to Preview' : 'Open Mix Database'}
 			>
 				<Database class="w-4 h-4" />
-				
+			</button>
+
+			<button 
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'preview'}
+				on:click={() => viewMode.set('preview')}
+				title="Switch to Preview"
+			>
+				<Monitor class="w-4 h-4" />
 			</button>
 
 			<button
@@ -312,6 +327,9 @@
 
 			<!-- Theme Toggle -->
 			<ThemeToggle />
+
+			<!-- Connection Status -->
+			<ConnectionStatus />
 
 			<!-- Publish Button -->
 			<!-- <PublishButton /> -->

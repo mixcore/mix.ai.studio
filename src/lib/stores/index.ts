@@ -30,6 +30,7 @@ export const selectedModel = writable<LLMModel>(availableModels[0]);
 export const previewUrl = writable('');
 export const previewLoading = writable(false);
 export const showCodeView = writable(false);
+export const viewMode = writable<'preview' | 'database'>('preview');
 
 export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
@@ -72,16 +73,29 @@ export const userActions = {
   },
 
   async initialize() {
-    const initialized = await mixcoreService.initialize();
-    if (initialized) {
-      const currentUser = mixcoreService.currentUser;
-      if (currentUser) {
-        user.set(currentUser);
-        mixcoreConnected.set(true);
-        await projectActions.loadProjects();
+    try {
+      const initialized = await mixcoreService.initialize();
+      if (initialized) {
+        const currentUser = mixcoreService.currentUser;
+        if (currentUser) {
+          user.set(currentUser);
+          mixcoreConnected.set(true);
+          // Try to load projects, but don't fail if it errors
+          try {
+            await projectActions.loadProjects();
+          } catch (projectError) {
+            console.warn('Failed to load projects during initialization:', projectError);
+          }
+        }
       }
+      return initialized;
+    } catch (error) {
+      console.error('Initialization error:', error);
+      // Reset to safe state
+      user.set(null);
+      mixcoreConnected.set(false);
+      return false;
     }
-    return initialized;
   }
 };
 

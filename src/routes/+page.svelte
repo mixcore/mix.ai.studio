@@ -3,9 +3,10 @@
 	import ResizableLayout from '$lib/components/layout/ResizableLayout.svelte';
 	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import PreviewPanel from '$lib/components/preview/PreviewPanel.svelte';
+	import MixDatabasePanel from '$lib/components/database/MixDatabasePanel.svelte';
 	import FloatingChatToggle from '$lib/components/navigation/FloatingChatToggle.svelte';
 	import { onMount } from 'svelte';
-	import { user, previewUrl, userActions, mixcoreConnected, isAuthenticated, hasProjects } from '$lib/stores';
+	import { user, previewUrl, userActions, mixcoreConnected, isAuthenticated, hasProjects, viewMode } from '$lib/stores';
 	import WelcomeScreen from '$lib/components/welcome/WelcomeScreen.svelte';
 	import AuthModal from '$lib/components/auth/AuthModal.svelte';
 
@@ -14,23 +15,36 @@
 	let authMode: 'login' | 'register' = 'login';
 	
 	onMount(async () => {
-		// Initialize Mixcore service
-		try {
-			await userActions.initialize();
-		} catch (error) {
-			console.error('Failed to initialize Mixcore:', error);
-		}
-		
-		// Set preview URL from environment variables, with a fallback.
-		// Vite exposes environment variables prefixed with VITE_ on the `import.meta.env` object.
+		// Set preview URL from environment variables first
 		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
 		previewUrl.set(endpoint || 'https://mixcore.net');
 
+		// Initialize Mixcore service with better error handling
+		try {
+			const initialized = await userActions.initialize();
+			if (!initialized) {
+				console.warn('Mixcore service failed to initialize - running in offline mode');
+				// Set connection status to disconnected
+				mixcoreConnected.set(false);
+			}
+		} catch (error) {
+			console.error('Failed to initialize Mixcore:', error);
+			// Ensure we're in a safe state even if initialization fails
+			mixcoreConnected.set(false);
+			user.set(null);
+			
+			// Show a toast or notification to the user (optional)
+			if (error instanceof Error && error.message.includes('HTTP Error')) {
+				console.warn('Mixcore endpoint unavailable - check network connection or endpoint configuration');
+			}
+		}
 	});
 	
 	// The welcome screen should only be visible when the user is not authenticated.
 	// This reactive statement makes the UI declarative and predictable.
-	$: showWelcome = !$isAuthenticated;
+	// If Mixcore is not connected, we can still show the app but with limited functionality
+	$: showWelcome = !$isAuthenticated && !import.meta.env.VITE_DEMO_MODE;
+	
 	
 	function handleWelcomeLogin() {
 		authMode = 'login';
@@ -52,6 +66,7 @@
 		// This function can be used for other post-login actions, like showing a toast.
 		showWelcome = false;
 	}
+
 </script>
 
 {#if showWelcome}
@@ -70,7 +85,9 @@
 		<div class="flex-1 overflow-hidden">
 			<ResizableLayout>
 				<ChatPanel slot="left" />
-				<PreviewPanel slot="right" />
+				<svelte:component this={$viewMode === 'preview' ? PreviewPanel : MixDatabasePanel} 
+					slot="right" 
+				/>
 			</ResizableLayout>
 		</div>
 

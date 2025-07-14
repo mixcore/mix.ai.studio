@@ -15,10 +15,10 @@
 
 <div class="flex flex-col h-full bg-muted/30">
 	<!-- Preview Content -->
-	<div class="flex-1 p-4 overflow-auto">
+	<div class="flex-1 overflow-auto">
 		{#if $showCodeView}
 			<!-- Code View -->
-			<div class="h-full bg-slate-900 text-green-400 rounded-lg p-4 font-mono text-sm overflow-auto">
+			<div class="h-full bg-slate-900 text-green-400 rounded-lg m-4 p-4 font-mono text-sm overflow-auto">
 				<div class="space-y-2">
 					<div class="text-gray-500">// Generated SvelteKit Application</div>
 					<div>&lt;script lang="ts"&gt;</div>
@@ -39,7 +39,7 @@
 			<!-- Live Preview -->
 			<div 
 				bind:this={iframeContainer}
-				class="h-full flex items-center justify-center"
+				class="h-full flex items-center justify-center p-4"
 			>
 				<div class={containerClass}>
 					{#if $previewLoading}

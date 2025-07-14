@@ -44,7 +44,8 @@
 
 <div 
 	bind:this={container}
-	class="flex h-full bg-base-100"
+	class="flex h-full bg-base-100 w-full"
+	class:select-none={isResizing}
 >
 	<!-- Left Panel (Chat) -->
 	{#if $showChatPanel}
@@ -72,15 +73,9 @@
 	<!-- Right Panel (Preview) -->
 	<div 
 		bind:this={rightPanel}
-		class="flex flex-col flex-1 transition-all duration-300"
-		style="width: {$showChatPanel ? 100 - leftPanelWidth : 100}%"
+		class="flex flex-col flex-1 transition-all duration-300 min-w-0"
 	>
 		<slot name="right" />
 	</div>
 </div>
 
-<style>
-	:global(body) {
-		user-select: none;
-	}
-</style>
