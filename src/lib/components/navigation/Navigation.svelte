@@ -16,7 +16,8 @@
 		Share,
 		Bot,
 		MessageSquare,
-		BrainCircuit
+		BrainCircuit,
+		GitBranch
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import {
@@ -314,6 +315,15 @@
 				title="Switch to Preview"
 			>
 				<Monitor class="w-4 h-4" />
+			</button>
+
+			<button 
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'agent'}
+				on:click={() => viewMode.set('agent')}
+				title="Agent Flow"
+			>
+				<GitBranch class="w-4 h-4" />
 			</button>
 
 			<button
