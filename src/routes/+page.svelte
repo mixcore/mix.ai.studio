@@ -5,6 +5,7 @@
 	import PreviewPanel from '$lib/components/preview/PreviewPanel.svelte';
 	import MixDatabasePanel from '$lib/components/database/MixDatabasePanel.svelte';
 	import AgentFlowPanel from '$lib/components/agent/AgentFlowPanel.svelte';
+	import VscodePanel from '$lib/components/vscode/VscodePanel.svelte';
 	import FloatingChatToggle from '$lib/components/navigation/FloatingChatToggle.svelte';
 	import { onMount } from 'svelte';
 	import { user, previewUrl, userActions, mixcoreConnected, isAuthenticated, hasProjects, viewMode } from '$lib/stores';
@@ -86,7 +87,7 @@
 		<div class="flex-1 overflow-hidden">
 			<ResizableLayout>
 				<ChatPanel slot="left" />
-				<svelte:component this={$viewMode === 'preview' ? PreviewPanel : $viewMode === 'database' ? MixDatabasePanel : AgentFlowPanel} 
+				<svelte:component this={$viewMode === 'preview' ? PreviewPanel : $viewMode === 'database' ? MixDatabasePanel : $viewMode === 'vscode' ? VscodePanel : AgentFlowPanel} 
 					slot="right" 
 				/>
 			</ResizableLayout>

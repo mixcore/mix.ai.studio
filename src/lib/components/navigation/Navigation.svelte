@@ -120,7 +120,11 @@
 	}
 
 	function toggleViewMode() {
-		viewMode.update(mode => mode === 'preview' ? 'database' : 'preview');
+		viewMode.update(mode => {
+			if (mode === 'preview') return 'database';
+			if (mode === 'database') return 'vscode';
+			return 'preview';
+		});
 	}
 </script>
 
@@ -324,6 +328,15 @@
 				title="Agent Flow"
 			>
 				<GitBranch class="w-4 h-4" />
+			</button>
+
+			<button 
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'vscode'}
+				on:click={() => viewMode.set('vscode')}
+				title="VSCode"
+			>
+				<Github class="w-4 h-4" />
 			</button>
 
 			<button

@@ -30,7 +30,7 @@ export const selectedModel = writable<LLMModel>(availableModels[0]);
 export const previewUrl = writable('');
 export const previewLoading = writable(false);
 export const showCodeView = writable(false);
-export const viewMode = writable<'preview' | 'database' | 'agent'>('preview');
+export const viewMode = writable<'preview' | 'database' | 'agent' | 'vscode'>('preview');
 
 export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
