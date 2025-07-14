@@ -1,8 +1,8 @@
-# Lovable-Inspired AI Development Platform
+# AI Development Platform
 
 ## Project Overview
 
-This is a web-based AI-powered development platform similar to Lovable, where users can build web applications through natural language chat interactions. The platform provides a complete development environment with real-time preview, code generation, and deployment capabilities.
+This is a web-based AI-powered development platform similar to AI build UI, where users can build web applications through natural language chat interactions. The platform provides a complete development environment with real-time preview, code generation, and deployment capabilities.
 
 ## Tech Stack
 

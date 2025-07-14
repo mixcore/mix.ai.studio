@@ -41,7 +41,7 @@
   themes: all;
 }
 
-/* Consistent spacing utilities for Lovable-inspired design */
+/* Consistent spacing utilities for design */
 @layer utilities {
   /* Panel header standardization */
   .panel-header {

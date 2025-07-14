@@ -11,6 +11,7 @@
 	import { user, previewUrl, userActions, mixcoreConnected, isAuthenticated, hasProjects, viewMode } from '$lib/stores';
 	import WelcomeScreen from '$lib/components/welcome/WelcomeScreen.svelte';
 	import AuthModal from '$lib/components/auth/AuthModal.svelte';
+	import { files as mockFiles } from '$lib/vsc-mock/files';
 
 	let showWelcome = true;
 	let showAuthModal = false;
@@ -87,8 +88,10 @@
 		<div class="flex-1 overflow-hidden">
 			<ResizableLayout>
 				<ChatPanel slot="left" />
-				<svelte:component this={$viewMode === 'preview' ? PreviewPanel : $viewMode === 'database' ? MixDatabasePanel : $viewMode === 'vscode' ? VscodePanel : AgentFlowPanel} 
+				<svelte:component 
+					this={$viewMode === 'vscode' ? VscodePanel : $viewMode === 'preview' ? PreviewPanel : $viewMode === 'database' ? MixDatabasePanel : AgentFlowPanel} 
 					slot="right" 
+					files={$viewMode === 'vscode' ? mockFiles : undefined}
 				/>
 			</ResizableLayout>
 		</div>

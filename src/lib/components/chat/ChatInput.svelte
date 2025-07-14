@@ -78,7 +78,7 @@
 		<textarea
 			bind:this={textArea}
 			bind:value={$chatInput}
-			placeholder="Ask Lovable to build your app..."
+			placeholder="Ask mixcore.ai to build your app..."
 			class={cn(
 				"w-full min-h-[60px] max-h-[200px] p-4 pr-20 text-sm",
 				"textarea textarea-bordered w-full resize-none",

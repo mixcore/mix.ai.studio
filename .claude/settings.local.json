@@ -14,7 +14,10 @@
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
       "Bash(pnpm add:*)",
-      "WebFetch(domain:svelte.dev)"
+      "WebFetch(domain:svelte.dev)",
+      "Bash(bun:*)",
+      "Bash(pkill:*)",
+      "Bash(true)"
     ],
     "deny": []
   }
