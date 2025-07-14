@@ -18,7 +18,6 @@
 		"@tailwindcss/postcss": "^4.1.11",
 		"@tailwindcss/typography": "^0.5.16",
 		"@types/node": "^24.0.13",
-		"@vitejs/plugin-basic-ssl": "^1.1.0",
 		"autoprefixer": "^10.4.21",
 		"daisyui": "^5.0.46",
 		"postcss": "^8.5.6",
