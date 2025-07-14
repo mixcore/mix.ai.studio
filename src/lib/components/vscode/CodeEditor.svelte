@@ -45,7 +45,8 @@
     }
   });
 
-  $: if (activeFile && monaco) {
+  // Watch for activeFile changes
+  $: if (activeFile && monaco && editorContainer) {
     if (!editor) {
       createEditor();
     } else {
@@ -55,6 +56,11 @@
   } else if (!activeFile && editor) {
     editor.dispose();
     editor = null;
+  }
+
+  // Watch for editorContainer to become available
+  $: if (editorContainer && monaco && activeFile && !editor) {
+    createEditor();
   }
 
   function getLanguage(filePath: string): string {
