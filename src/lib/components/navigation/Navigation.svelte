@@ -17,7 +17,8 @@
 		Bot,
 		MessageSquare,
 		BrainCircuit,
-		GitBranch
+		GitBranch,
+		CodeXml
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import {
@@ -336,7 +337,7 @@
 				on:click={() => viewMode.set('vscode')}
 				title="VSCode"
 			>
-				<Github class="w-4 h-4" />
+				<CodeXml class="w-4 h-4" />
 			</button>
 
 			<button

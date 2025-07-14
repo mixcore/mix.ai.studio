@@ -21,15 +21,23 @@
 
   onMount(async () => {
     monaco = await loader.init();
-    editor = monaco.editor.create(editorContainer, {
-      value: activeFile ? activeFile.content : '',
-      language: activeFile ? getLanguage(activeFile.path) : 'plaintext',
-      theme: 'vs-dark',
-      automaticLayout: true,
-      readOnly: false,
-      minimap: { enabled: false },
-    });
+    if (activeFile) {
+      createEditor();
+    }
   });
+
+  function createEditor() {
+    if (editorContainer && monaco && activeFile) {
+      editor = monaco.editor.create(editorContainer, {
+        value: activeFile.content,
+        language: getLanguage(activeFile.path),
+        theme: 'vs-dark',
+        automaticLayout: true,
+        readOnly: false,
+        minimap: { enabled: false },
+      });
+    }
+  }
 
   onDestroy(() => {
     if (editor) {
@@ -37,9 +45,16 @@
     }
   });
 
-  $: if (editor && activeFile && monaco) {
-    editor.setValue(activeFile.content);
-    monaco.editor.setModelLanguage(editor.getModel(), getLanguage(activeFile.path));
+  $: if (activeFile && monaco) {
+    if (!editor) {
+      createEditor();
+    } else {
+      editor.setValue(activeFile.content);
+      monaco.editor.setModelLanguage(editor.getModel(), getLanguage(activeFile.path));
+    }
+  } else if (!activeFile && editor) {
+    editor.dispose();
+    editor = null;
   }
 
   function getLanguage(filePath: string): string {
@@ -94,20 +109,32 @@
 </script>
 
 <div class="flex flex-col h-full">
-  <div role="tablist" class="tabs tabs-lifted">
-    {#each openFiles as file (file.path)}
-      <a role="tab" 
-         class="tab {activeFile && activeFile.path === file.path ? 'tab-active' : ''}" 
-         on:click={() => selectFile(file)}>
-        {file.path}
-        <span role="button" class="ml-2" on:click|stopPropagation={() => closeFile(file)}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </span>
-      </a>
-    {/each}
-    <a role="tab" class="tab tab-lifted"></a>
-  </div>
+  {#if openFiles.length > 0}
+    <div role="tablist" class="tabs tabs-lifted">
+      {#each openFiles as file (file.path)}
+        <a role="tab" 
+           class="tab {activeFile && activeFile.path === file.path ? 'tab-active' : ''}" 
+           on:click={() => selectFile(file)}>
+          {file.path}
+          <span role="button" class="ml-2" on:click|stopPropagation={() => closeFile(file)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </span>
+        </a>
+      {/each}
+      <a role="tab" class="tab tab-lifted"></a>
+    </div>
+  {/if}
+  
   <div class="flex w-full flex-1 overflow-hidden bg-base-100">
-    <div class="w-full h-full" bind:this={editorContainer}></div>
+    {#if activeFile}
+      <div class="w-full h-full" bind:this={editorContainer}></div>
+    {:else}
+      <div class="flex items-center justify-center w-full h-full text-base-content/50">
+        <div class="text-center">
+          <p class="text-lg mb-2">No file selected</p>
+          <p class="text-sm">Select a file from the explorer to start editing</p>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
