@@ -2,35 +2,27 @@
 	import { Send, Image, Eye, MessageSquare } from 'lucide-svelte';
 	import { chatInput, chatLoading, chatMessages } from '$lib/stores';
 	import { cn } from '$lib/utils';
+	import { sendChatMessage } from '$lib/services/chat';
+	import type { ChatMessage } from '$lib/services/mixcore';
 
 	let textArea: HTMLTextAreaElement;
 	let fileInput: HTMLInputElement;
 
-	function handleSubmit() {
+	async function handleSubmit() {
 		if (!$chatInput.trim() || $chatLoading) return;
 		
-		const message = {
+		const message: ChatMessage = {
 			id: Date.now().toString(),
 			content: $chatInput,
-			role: 'user' as const,
-			timestamp: new Date()
+			role: 'user',
+			timestamp: new Date().toISOString()
 		};
 
 		chatMessages.update(messages => [...messages, message]);
 		chatInput.set('');
 		
-		// Simulate AI response
-		chatLoading.set(true);
-		setTimeout(() => {
-			const response = {
-				id: (Date.now() + 1).toString(),
-				content: "I'll help you build that! Let me start by creating the necessary components and structure for your project.",
-				role: 'assistant' as const,
-				timestamp: new Date()
-			};
-			chatMessages.update(messages => [...messages, response]);
-			chatLoading.set(false);
-		}, 2000);
+		// Send message to AI
+		await sendChatMessage($chatInput);
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
