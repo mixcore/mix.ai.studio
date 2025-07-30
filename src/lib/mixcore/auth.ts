@@ -168,7 +168,24 @@ export class AuthModule {
       return this._currentUser;
     } catch (error) {
       console.error('Failed to get user data:', error);
-      // Don't clear tokens here, might be temporary network issue
+      
+      // If the error is due to authentication (401/403), try to refresh token
+      if (error instanceof Error && error.message.includes('401')) {
+        console.log('Access token expired, attempting refresh...');
+        try {
+          const refreshed = await this.refreshToken();
+          if (refreshed) {
+            // Retry getting user data with new token
+            const retryResponse = await this.api.get<User>('/rest/auth/me/');
+            this._currentUser = retryResponse.data;
+            return this._currentUser;
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          this.logout(); // Clear invalid tokens
+        }
+      }
+      
       return null;
     }
   }
