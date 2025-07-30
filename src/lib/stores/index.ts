@@ -9,6 +9,7 @@ export const workspace = writable<Workspace | null>(null);
 export const chatMessages = writable<ChatMessage[]>([]);
 export const chatLoading = writable(false);
 export const connectionStatus = writable<'connected' | 'disconnected' | 'error'>('disconnected');
+export const authToken = writable<string | null>(null);
 export const chatMode = writable<'default' | 'chat-only' | 'agent'>('default');
 export const chatInput = writable('');
 

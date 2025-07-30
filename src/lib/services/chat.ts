@@ -1,13 +1,16 @@
 import { get } from 'svelte/store';
-import { chatMessages, chatLoading, connectionStatus } from '$lib/stores';
+import { chatMessages, chatLoading, connectionStatus, authToken } from '$lib/stores';
 import type { ChatMessage } from './mixcore';
 
 let socket: WebSocket | null = null;
 
-export function initChatSocket(accessToken: string) {
+export function initChatSocket() {
+  const token = get(authToken);
+  if (!token) throw new Error('No auth token available');
+
   if (socket) return;
 
-  socket = new WebSocket(`wss://mixcore.net/hub/portalHub?access_token=${accessToken}`);
+  socket = new WebSocket(`wss://mixcore.net/hub/portalHub?access_token=${token}`);
 
   socket.onopen = () => {
     connectionStatus.set('connected');
@@ -32,14 +35,19 @@ export function sendChatMessage(content: string): void {
   chatLoading.set(true);
   
   try {
+    // Generate more unique ID with random suffix
+    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id,
       content,
       role: 'user',
       timestamp: new Date().toISOString()
     };
     
     chatMessages.update(messages => [...messages, userMessage]);
+    
+    if (!socket) initChatSocket();
     
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
