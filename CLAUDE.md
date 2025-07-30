@@ -74,7 +74,10 @@ The LLM service (`src/lib/services/llm.ts`) integrates multiple AI providers:
 - **Anthropic Claude**: Claude-3.5 Sonnet, Claude-3 Haiku, Claude-3 Opus
 - **Google Gemini**: Gemini Pro, Gemini Flash models
 - **DeepSeek**: DeepSeek Chat, DeepSeek Coder models
-- **MCP Integration**: Model Context Protocol for enhanced functionality
+- **MCP Integration**: Model Context Protocol with dynamic endpoint configuration
+  - Automatically uses SDK client endpoint to generate MCP server URLs
+  - Using `mixcore.net` for MCP connections
+  - Supports local development and custom domain configurations
 
 #### Database Service
 
@@ -213,10 +216,13 @@ const updatedUser = await client.database.updateData('users', userId, {
 ### LLM Integration
 ```typescript
 import { createLLMService } from '$lib/services/llm';
+import { initializeSDK } from '$lib/sdk/client';
 
+const sdkClient = initializeSDK();
 const llmService = createLLMService({
   defaultProvider: 'claude',
-  defaultModel: 'claude-3-5-sonnet-20241022'
+  defaultModel: 'claude-3-5-sonnet-20241022',
+  sdkEndpoint: sdkClient.getConfig().endpoint // Uses SDK endpoint for MCP connections
 });
 
 // Configure provider
