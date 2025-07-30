@@ -16,6 +16,27 @@
 	let showWelcome = true;
 	let showAuthModal = false;
 	let authMode: 'login' | 'register' = 'login';
+
+	onMount(() => {
+		// Handle auth success events from token injection
+		const handleAuthSuccess = () => {
+			showAuthModal = false;
+		};
+
+		// Handle auth errors from token injection
+		const handleAuthError = () => {
+			authMode = 'login';
+			showAuthModal = true;
+		};
+
+		window.addEventListener('auth-success', handleAuthSuccess);
+		window.addEventListener('auth-error', handleAuthError);
+
+		return () => {
+			window.removeEventListener('auth-success', handleAuthSuccess);
+			window.removeEventListener('auth-error', handleAuthError);
+		};
+	});
 	
 	onMount(async () => {
 		// Set preview URL from environment variables first

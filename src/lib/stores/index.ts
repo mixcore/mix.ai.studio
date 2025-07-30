@@ -9,7 +9,50 @@ export const workspace = writable<Workspace | null>(null);
 export const chatMessages = writable<ChatMessage[]>([]);
 export const chatLoading = writable(false);
 export const connectionStatus = writable<'connected' | 'disconnected' | 'error'>('disconnected');
-export const authToken = writable<string | null>(null);
+interface AuthTokens {
+  accessToken: string | null;
+  refreshToken: string | null;
+}
+
+import { TokenService } from '$lib/services/token';
+
+export const authToken = writable<AuthTokens>({
+  accessToken: null,
+  refreshToken: null
+});
+
+export async function refreshAuthToken(): Promise<boolean> {
+  const tokens = get(authToken);
+  if (!tokens.refreshToken) return false;
+  
+  try {
+    const response = await fetch('https://mixcore.net/api/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const tokensSaved = await TokenService.setTokens(data.accessToken, data.refreshToken);
+      if (!tokensSaved) {
+        throw new Error('Failed to save refreshed tokens');
+      }
+      
+      authToken.set({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return false;
+  }
+}
 export const chatMode = writable<'default' | 'chat-only' | 'agent'>('default');
 export const chatInput = writable('');
 
@@ -56,6 +99,15 @@ export const userActions = {
       if (mixcoreUser) {
         user.set(mixcoreUser);
         mixcoreConnected.set(true);
+        
+        // Also update authToken with tokens from storage
+        const accessToken = await TokenService.getAccessToken();
+        const refreshToken = await TokenService.getRefreshToken();
+        authToken.set({
+          accessToken,
+          refreshToken
+        });
+        
         return true;
       }
       return false;

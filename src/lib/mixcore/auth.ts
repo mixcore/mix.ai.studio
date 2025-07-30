@@ -10,6 +10,7 @@ import {
   validateMinLength 
 } from './helpers';
 import type { ApiClient } from './api';
+import { TokenService } from '$lib/services/token';
 
 export interface AuthCallbacks {
   success?: (data: any) => void;
@@ -49,10 +50,12 @@ export class AuthModule {
     return !!this._tokenInfo?.access_token;
   }
 
-  private loadTokenFromStorage(): void {
+  private async loadTokenFromStorage(): Promise<void> {
     try {
-      const token = localStorage.getItem(this.tokenKey);
-      const refreshToken = localStorage.getItem(this.refreshTokenKey);
+      const [token, refreshToken] = await Promise.all([
+        TokenService.getAccessToken(),
+        TokenService.getRefreshToken()
+      ]);
       
       if (token && refreshToken) {
         this._tokenInfo = {
@@ -67,20 +70,24 @@ export class AuthModule {
     }
   }
 
-  private saveTokenToStorage(tokenInfo: TokenInfo): void {
+  private async saveTokenToStorage(tokenInfo: TokenInfo): Promise<void> {
     try {
-      localStorage.setItem(this.tokenKey, tokenInfo.access_token);
-      localStorage.setItem(this.refreshTokenKey, tokenInfo.refresh_token);
+      const saved = await TokenService.setTokens(tokenInfo.access_token, tokenInfo.refresh_token);
+      if (!saved) {
+        throw new Error('Failed to save tokens');
+      }
       this._tokenInfo = tokenInfo;
     } catch (error) {
       console.error('Failed to save token to storage:', error);
     }
   }
 
-  private clearTokenFromStorage(): void {
+  private async clearTokenFromStorage(): Promise<void> {
     try {
-      localStorage.removeItem(this.tokenKey);
-      localStorage.removeItem(this.refreshTokenKey);
+      const cleared = await TokenService.clearTokens();
+      if (!cleared) {
+        throw new Error('Failed to clear tokens');
+      }
       this._tokenInfo = null;
       this._currentUser = null;
     } catch (error) {
@@ -142,16 +149,16 @@ export class AuthModule {
 
   async register(credentials: RegisterCredentials): Promise<User> {
     // Validate input
-    validateRequired(credentials.userName, 'Username');
+    validateRequired(credentials.username, 'Username');
     validateEmail(credentials.email);
     validateMinLength(credentials.password, 6, 'Password');
 
-    // Construct payload with correct key casing
-    const payload = {
-      userName: credentials.userName,
-      email: credentials.email,
-      password: credentials.password
-    };
+      // Construct payload with correct key casing
+      const payload = {
+        username: credentials.username,
+        email: credentials.email,
+        password: credentials.password
+      };
 
     const response = await this.api.post<User>('/rest/auth/register/', payload);
     return response.data;

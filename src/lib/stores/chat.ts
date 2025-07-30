@@ -4,7 +4,7 @@ import type { HubConnection } from '@microsoft/signalr';
 
 export const chatMessages = writable<ChatMessage[]>([]);
 export const chatLoading = writable(false);
-export const connectionStatus = writable<'connected' | 'disconnected' | 'error'>('disconnected');
+export const connectionStatus = writable<'connected' | 'disconnected' | 'error' | 'auth_error'>('disconnected');
 
 let connection: HubConnection | null = null;
 
