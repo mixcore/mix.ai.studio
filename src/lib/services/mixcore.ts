@@ -59,7 +59,15 @@ class MixcoreService {
         this.client = new MixcoreClient(this.config);
       }
       
-      return await this.client.initialize();
+      // Try to initialize user data if we have a stored token
+      try {
+        await this.client.auth.initUserData();
+        return true;
+      } catch (error) {
+        // This is expected if user is not logged in or token is expired
+        console.log('No valid authentication found, user needs to login');
+        return true; // Still consider initialization successful
+      }
     } catch (error) {
       console.error('Failed to initialize Mixcore service:', error);
       return false;
