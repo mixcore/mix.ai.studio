@@ -5,14 +5,13 @@
  * providing a unified interface for all SDK operations.
  */
 
-// Import the SDK client from the built distribution
-import { MixcoreClient } from '../sdk/dist/index.esm.js';
-import type { IClientConfig } from '../sdk/dist/index.d.ts';
-
-// Configuration interface extending the SDK config
-export interface AppClientConfig extends IClientConfig {
+// Configuration interface for the SDK
+export interface AppClientConfig {
   endpoint?: string;
   apiVersion?: string;
+  tokenKey?: string;
+  refreshTokenKey?: string;
+  tokenType?: string;
   timeout?: number;
   retryCount?: number;
   enableCache?: boolean;
@@ -32,45 +31,53 @@ const DEFAULT_CONFIG: AppClientConfig = {
   debug: import.meta.env.DEV
 };
 
-// SDK Client wrapper class
+// Mock SDK Client wrapper class for now
 export class MixcoreSDKClient {
-  private client: any;
   private config: AppClientConfig;
 
   constructor(config: Partial<AppClientConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
-    // Initialize the SDK client
-    this.client = new MixcoreClient({
-      endpoint: this.config.endpoint,
-      tokenKey: this.config.tokenKey,
-      refreshTokenKey: this.config.refreshTokenKey,
-      tokenType: this.config.tokenType,
-      events: {
-        onAuthSuccess: () => this.handleAuthSuccess(),
-        onAuthError: () => this.handleAuthError()
-      }
-    });
   }
 
   // Authentication methods
   get auth() {
-    return this.client.auth;
+    return {
+      login: async (credentials: any) => {
+        console.log('Mock SDK Auth: Login', credentials);
+        return { user: { id: 1, email: credentials.email } };
+      },
+      logout: async () => {
+        console.log('Mock SDK Auth: Logout');
+      },
+      getCurrentUser: async () => {
+        console.log('Mock SDK Auth: Get current user');
+        return null;
+      }
+    };
   }
 
   // Database methods
   get database() {
-    return this.client.database;
+    return {
+      getTables: async () => {
+        console.log('Mock SDK Database: Get tables');
+        return [];
+      },
+      getData: async (tableName: string, query?: any) => {
+        console.log('Mock SDK Database: Get data', tableName, query);
+        return { data: [], count: 0 };
+      }
+    };
   }
 
   // Storage methods  
   get storage() {
-    return this.client.storage;
-  }
-
-  // Get the underlying SDK client
-  getClient() {
-    return this.client;
+    return {
+      upload: async (file: File) => {
+        console.log('Mock SDK Storage: Upload', file.name);
+        return { url: URL.createObjectURL(file) };
+      }
+    };
   }
 
   // Get current configuration
@@ -81,19 +88,6 @@ export class MixcoreSDKClient {
   // Update configuration
   updateConfig(newConfig: Partial<AppClientConfig>) {
     this.config = { ...this.config, ...newConfig };
-    // Reinitialize client with new config if needed
-    if (newConfig.endpoint || newConfig.tokenKey || newConfig.refreshTokenKey) {
-      this.client = new MixcoreClient({
-        endpoint: this.config.endpoint,
-        tokenKey: this.config.tokenKey,
-        refreshTokenKey: this.config.refreshTokenKey,
-        tokenType: this.config.tokenType,
-        events: {
-          onAuthSuccess: () => this.handleAuthSuccess(),
-          onAuthError: () => this.handleAuthError()
-        }
-      });
-    }
   }
 
   // Connection test
@@ -105,19 +99,6 @@ export class MixcoreSDKClient {
     } catch (error) {
       console.error('Connection test failed:', error);
       return false;
-    }
-  }
-
-  // Event handlers
-  private handleAuthSuccess() {
-    if (this.config.debug) {
-      console.log('SDK Auth Success');
-    }
-  }
-
-  private handleAuthError() {
-    if (this.config.debug) {
-      console.log('SDK Auth Error');
     }
   }
 }

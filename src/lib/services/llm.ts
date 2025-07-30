@@ -192,7 +192,7 @@ export class LLMService {
 
   // HTTP polling for MCP
   private async connectHTTP(name: string, connection: MCPConnection) {
-    const client = {
+    const client: any = {
       url: connection.url,
       polling: true,
       poll: async () => {

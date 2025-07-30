@@ -6,7 +6,11 @@
  */
 
 import { createSDKClient, getSDKClient } from '../sdk/client';
-import type { MixQuery } from '../sdk/dist/index.d.ts';
+
+// Define basic query types locally
+export interface MixQuery {
+  toQueryParams(): Record<string, any>;
+}
 
 export interface TableInfo {
   id: string;
@@ -46,7 +50,7 @@ export interface IndexDefinition {
 
 export interface RelationshipDefinition {
   name: string;
-  type: 'one-to-one' | 'one-to-many' | 'many-to-many';
+  type: 'one-to-one' | 'one-to-many' | 'many-to-many' | 'many-to-one';
   targetTable: string;
   targetColumn: string;
   sourceColumn: string;

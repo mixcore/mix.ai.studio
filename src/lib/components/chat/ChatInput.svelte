@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { Send, Image, Eye, MessageSquare } from 'lucide-svelte';
-	import { chatInput, chatLoading, chatMessages } from '$lib/stores';
+	import { 
+		chatInput, 
+		chatLoading, 
+		chatMessages, 
+		llmService, 
+		selectedLLMProvider, 
+		selectedLLMModel,
+		llmSettings
+	} from '$lib/stores';
 	import { cn } from '$lib/utils';
 
 	let textArea: HTMLTextAreaElement;
 	let fileInput: HTMLInputElement;
 
-	function handleSubmit() {
+	async function handleSubmit() {
 		if (!$chatInput.trim() || $chatLoading) return;
 		
 		const message = {
@@ -17,20 +25,55 @@
 		};
 
 		chatMessages.update(messages => [...messages, message]);
+		const userMessage = $chatInput;
 		chatInput.set('');
 		
-		// Simulate AI response
+		// Set loading state
 		chatLoading.set(true);
-		setTimeout(() => {
-			const response = {
+		
+		try {
+			// Prepare messages for LLM
+			const llmMessages = $chatMessages.map(msg => ({
+				role: msg.role,
+				content: msg.content
+			}));
+
+			// Send to LLM service
+			const response = await llmService.sendMessage(llmMessages, {
+				provider: $selectedLLMProvider,
+				model: $selectedLLMModel,
+				temperature: $llmSettings.temperature,
+				maxTokens: $llmSettings.maxTokens
+			});
+
+			// Add AI response
+			const aiMessage = {
 				id: (Date.now() + 1).toString(),
-				content: "I'll help you build that! Let me start by creating the necessary components and structure for your project.",
+				content: response.content,
+				role: 'assistant' as const,
+				timestamp: new Date().toISOString(),
+				metadata: {
+					model: response.model,
+					usage: response.usage
+				}
+			};
+
+			chatMessages.update(messages => [...messages, aiMessage]);
+		} catch (error) {
+			console.error('Failed to send message to LLM:', error);
+			
+			// Add error message
+			const errorMessage = {
+				id: (Date.now() + 1).toString(),
+				content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your LLM configuration and API keys.`,
 				role: 'assistant' as const,
 				timestamp: new Date().toISOString()
 			};
-			chatMessages.update(messages => [...messages, response]);
+
+			chatMessages.update(messages => [...messages, errorMessage]);
+		} finally {
 			chatLoading.set(false);
-		}, 2000);
+		}
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
