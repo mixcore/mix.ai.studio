@@ -1,5 +1,7 @@
-import { MixcoreClient, MixQuery } from '$lib/mixcore';
-import type { IClientConfig, User as MixcoreUser, DatabaseRecord } from '$lib/mixcore';
+import { MixcoreClient } from '$lib/sdk-client/packages/sdk-client/src/client';
+import { MixQuery } from '$lib/sdk-client/packages/sdk-client/src/query';
+import type { IClientConfig, IProfile as MixcoreUser } from '$lib/sdk-client/packages/sdk-client/src/types';
+import type { IDynamicData as DatabaseRecord } from '$lib/sdk-client/packages/sdk-client/src/base';
 
 // Extended project interface for Mixcore
 export interface Project extends DatabaseRecord {
@@ -59,9 +61,29 @@ class MixcoreService {
         this.client = new MixcoreClient(this.config);
       }
       
-      // Try to initialize user data if we have a stored token
+      // Try to restore authentication state from localStorage
       try {
-        await this.client.auth.initUserData();
+        const { SafeLocalStorage } = await import('$lib/sdk-client/packages/sdk-client/src/helpers');
+        const token = SafeLocalStorage.getItemSync(this.config.tokenKey!);
+        const refreshToken = SafeLocalStorage.getItemSync(this.config.refreshTokenKey!);
+        
+        if (token && refreshToken) {
+          // Restore token info
+          this.client.auth.tokenInfo = {
+            accessToken: token,
+            refreshToken: refreshToken,
+            tokenType: 'Bearer'
+          };
+          
+          // Set auth header for API requests
+          const { setAuthToken } = await import('$lib/sdk-client/packages/sdk-client/src/api');
+          setAuthToken(token, 'Bearer');
+          
+          // Try to restore user data
+          await this.client.auth.initUserData();
+          console.log('✅ Authentication state restored from storage');
+        }
+        
         return true;
       } catch (error) {
         // This is expected if user is not logged in or token is expired
@@ -119,11 +141,11 @@ class MixcoreService {
   }
 
   get isAuthenticated(): boolean {
-    return this.client?.isAuthenticated || false;
+    return !!this.client?.auth.currentUser;
   }
 
   get currentUser(): User | null {
-    return this.client?.currentUser as User || null;
+    return this.client?.auth.currentUser as User || null;
   }
 
   // Project management
@@ -140,14 +162,14 @@ class MixcoreService {
     }
   }
 
-  async createProject(projectData: Omit<Project, 'id' | 'createdDate' | 'modifiedDate'>): Promise<Project | null> {
+  async createProject(projectData: Omit<Project, 'id' | 'createdDate' | 'modifiedDate' | 'ownerId'>): Promise<Project | null> {
     try {
       const client = this.getClient();
       const data = {
         ...projectData,
         createdDate: new Date().toISOString(),
         modifiedDate: new Date().toISOString(),
-        ownerId: client.currentUser?.id || ''
+        ownerId: client.auth.currentUser?.id || ''
       };
       
       return await client.database.createData<Project>('projects', data);

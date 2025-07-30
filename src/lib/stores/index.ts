@@ -5,10 +5,8 @@ import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/
 export { mixcoreService };
 import { createLLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
-import { initializeSDK } from '$lib/sdk/client';
-
 // Initialize services
-export const sdkClient = initializeSDK();
+// Note: The real SDK client is now handled through mixcoreService
 export const llmService = createLLMService();
 export const databaseService = createDatabaseService();
 

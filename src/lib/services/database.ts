@@ -5,7 +5,7 @@
  * tables, and records with a modern, intuitive interface.
  */
 
-import { createSDKClient, getSDKClient } from '../sdk/client';
+import { mixcoreService } from './mixcore';
 
 // Define basic query types locally
 export interface MixQuery {
@@ -113,10 +113,8 @@ export interface FilterCondition {
 }
 
 export class DatabaseService {
-  private sdkClient: any;
-
   constructor() {
-    this.sdkClient = getSDKClient() || createSDKClient();
+    // Use the real mixcore service which has the actual SDK client
   }
 
   // Get database statistics
