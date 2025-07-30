@@ -34,8 +34,23 @@ export class TokenService {
    */
   static async setTokens(accessToken: string, refreshToken: string): Promise<boolean> {
     try {
-      const accessSaved = await SafeLocalStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
-      const refreshSaved = await SafeLocalStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
+      console.log('Saving tokens to localStorage...', { 
+        accessToken: accessToken ? '***' : 'null',
+        refreshToken: refreshToken ? '***' : 'null' 
+      });
+      const accessSaved = SafeLocalStorage.setItemSync(this.ACCESS_TOKEN_KEY, accessToken);
+      const refreshSaved = SafeLocalStorage.setItemSync(this.REFRESH_TOKEN_KEY, refreshToken);
+      
+      console.log('Token save results:', { accessSaved, refreshSaved });
+      
+      // Verify tokens were actually saved
+      const storedAccess = SafeLocalStorage.getItemSync(this.ACCESS_TOKEN_KEY);
+      const storedRefresh = SafeLocalStorage.getItemSync(this.REFRESH_TOKEN_KEY);
+      console.log('Stored tokens:', {
+        accessToken: storedAccess ? '***' : 'null',
+        refreshToken: storedRefresh ? '***' : 'null'
+      });
+      
       return accessSaved && refreshSaved;
     } catch (error) {
       console.error('Failed to save tokens:', error);

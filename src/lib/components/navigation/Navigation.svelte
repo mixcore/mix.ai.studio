@@ -119,14 +119,6 @@
 			alert('No project selected');
 		}
 	}
-
-	function toggleViewMode() {
-		viewMode.update(mode => {
-			if (mode === 'preview') return 'database';
-			if (mode === 'database') return 'vscode';
-			return 'preview';
-		});
-	}
 </script>
 
 <nav class="navbar bg-base-100 border-b border-base-300 h-12 min-h-12 px-4">
@@ -162,62 +154,6 @@
 					</button>
 				</li>
 				<div class="divider my-1"></div>
-				<li class="menu-title">
-					<span class="text-sm font-medium">AI Assistant</span>
-				</li>
-				<li>
-					<button 
-						class="flex items-center gap-2"
-						class:bg-primary={$chatMode === 'default'}
-						class:text-primary-content={$chatMode === 'default'}
-						on:click={() => setChatMode('default')}
-					>
-						<Bot class="w-4 h-4" />
-						Default Mode
-					</button>
-				</li>
-				<li>
-					<button 
-						class="flex items-center gap-2"
-						class:bg-primary={$chatMode === 'chat-only'}
-						class:text-primary-content={$chatMode === 'chat-only'}
-						on:click={() => setChatMode('chat-only')}
-					>
-						<MessageSquare class="w-4 h-4" />
-						Chat Only
-					</button>
-				</li>
-				<li>
-					<button 
-						class="flex items-center gap-2"
-						class:bg-primary={$chatMode === 'agent'}
-						class:text-primary-content={$chatMode === 'agent'}
-						on:click={() => setChatMode('agent')}
-					>
-						<Settings class="w-4 h-4" />
-						Agent Mode
-					</button>
-				</li>
-				<div class="divider my-1"></div>
-				<li class="menu-title">
-					<span class="flex items-center gap-2">
-						<BrainCircuit class="w-4 h-4" />
-						<span>Model</span>
-					</span>
-				</li>
-				{#each availableModels as model}
-					<li>
-						<button
-							class="flex justify-between w-full"
-							class:active={$selectedModel.id === model.id}
-							on:click={() => selectedModel.set(model)}
-						>
-							<span>{model.name}</span>
-							<span class="badge badge-ghost badge-sm">{model.provider}</span>
-						</button>
-					</li>
-				{/each}
-				<div class="divider my-1"></div>
 				<li>
 					<button class="flex items-center gap-2" on:click={() => showProjectSettings = true}>
 						<Settings class="w-4 h-4" />
@@ -231,63 +167,22 @@
 		<ChatToggle />
 	</div>
 
-	<!-- Center Section: Preview Controls -->
+	<!-- Center Section: View & Device Controls -->
 	<div class="navbar-center">
-		<div class="flex items-center gap-2">
-			<!-- Device Mode Selector -->
+		<div class="flex items-center gap-4">
+			<!-- View Mode Selector -->
 			<div class="flex items-center bg-base-200 rounded-md p-1">
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'desktop' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					on:click={() => setDeviceMode('desktop')}
-					title="Desktop view"
-				>
-					<Monitor class="w-4 h-4" />
-				</button>
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'tablet' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					on:click={() => setDeviceMode('tablet')}
-					title="Tablet view"
-				>
-					<Tablet class="w-4 h-4" />
-				</button>
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'mobile' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					on:click={() => setDeviceMode('mobile')}
-					title="Mobile view"
-				>
-					<Smartphone class="w-4 h-4" />
-				</button>
+				<button class="btn btn-sm btn-ghost" class:btn-active={$viewMode === 'preview'} on:click={() => viewMode.set('preview')} title="Preview"><Monitor class="w-4 h-4" /></button>
+				<button class="btn btn-sm btn-ghost" class:btn-active={$viewMode === 'database'} on:click={() => viewMode.set('database')} title="Database"><Database class="w-4 h-4" /></button>
+				<button class="btn btn-sm btn-ghost" class:btn-active={$viewMode === 'agent'} on:click={() => viewMode.set('agent')} title="Agent Flow"><GitBranch class="w-4 h-4" /></button>
+				<button class="btn btn-sm btn-ghost" class:btn-active={$viewMode === 'vscode'} on:click={() => viewMode.set('vscode')} title="VSCode"><CodeXml class="w-4 h-4" /></button>
 			</div>
 
-			<button 
-				class="btn btn-ghost btn-sm"
-				on:click={refreshPreview}
-				title="Refresh preview"
-			>
-				<RefreshCw class="w-4 h-4" />
-			</button>
-			
-			<button 
-				class="btn btn-ghost btn-sm"
-				on:click={openInNewTab}
-				title="Open in new tab"
-			>
-				<ExternalLink class="w-4 h-4" />
-			</button>
-
-			<!-- URL Bar -->
-			<div class="flex items-center gap-1 bg-base-200 rounded-md px-2 py-1 text-xs">
-				<Globe class="w-4 h-4 text-base-content/60" />
-				<span class="text-base-content/70">{$previewUrl}</span>
+			<!-- Device Mode Selector -->
+			<div class="flex items-center bg-base-200 rounded-md p-1">
+				<button class={cn("btn btn-sm btn-ghost", $deviceMode === 'desktop' ? "bg-base-100 shadow-sm" : "hover:bg-base-300")} on:click={() => setDeviceMode('desktop')} title="Desktop view"><Monitor class="w-4 h-4" /></button>
+				<button class={cn("btn btn-sm btn-ghost", $deviceMode === 'tablet' ? "bg-base-100 shadow-sm" : "hover:bg-base-300")} on:click={() => setDeviceMode('tablet')} title="Tablet view"><Tablet class="w-4 h-4" /></button>
+				<button class={cn("btn btn-sm btn-ghost", $deviceMode === 'mobile' ? "bg-base-100 shadow-sm" : "hover:bg-base-300")} on:click={() => setDeviceMode('mobile')} title="Mobile view"><Smartphone class="w-4 h-4" /></button>
 			</div>
 		</div>
 	</div>
@@ -295,58 +190,28 @@
 	<!-- Right Section: Collaboration & User -->
 	<div class="navbar-end">
 		<div class="flex items-center gap-2">
+			<!-- AI Model Selector -->
+			<div class="dropdown dropdown-end">
+				<div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+					<BrainCircuit class="w-4 h-4" />
+					<span class="hidden md:inline">{$selectedModel.name}</span>
+					<ChevronDown class="w-3 h-3" />
+				</div>
+				<ul class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300">
+					{#each availableModels as model}
+						<li>
+							<button class="flex justify-between w-full" class:active={$selectedModel.id === model.id} on:click={() => selectedModel.set(model)}>
+								<span>{model.name}</span>
+								<span class="badge badge-ghost badge-sm">{model.provider}</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</div>
+
 			<!-- Collaboration Tools -->
-			<button 
-	class="btn btn-ghost btn-sm"
-				on:click={() => showInviteModal.set(true)}
-			>
+			<button class="btn btn-ghost btn-sm" on:click={() => showInviteModal.set(true)}>
 				<Users class="w-4 h-4" />
-			
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'database'}
-				on:click={toggleViewMode}
-				title={$viewMode === 'database' ? 'Switch to Preview' : 'Open Mix Database'}
-			>
-				<Database class="w-4 h-4" />
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'preview'}
-				on:click={() => viewMode.set('preview')}
-				title="Switch to Preview"
-			>
-				<Monitor class="w-4 h-4" />
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'agent'}
-				on:click={() => viewMode.set('agent')}
-				title="Agent Flow"
-			>
-				<GitBranch class="w-4 h-4" />
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'vscode'}
-				on:click={() => viewMode.set('vscode')}
-				title="VSCode"
-			>
-				<CodeXml class="w-4 h-4" />
-			</button>
-
-			<button
-	class="btn btn-ghost btn-sm"
-				title="Refresh Data"
-				aria-label="Refresh Data"
-			>
-				<Github class="w-4 h-4" />
-				
 			</button>
 
 			<!-- Theme Toggle -->
@@ -354,9 +219,6 @@
 
 			<!-- Connection Status -->
 			<ConnectionStatus />
-
-			<!-- Publish Button -->
-			<!-- <PublishButton /> -->
 
 			<!-- User Menu -->
 			<UserMenu />

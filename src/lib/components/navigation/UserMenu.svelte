@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import { User, Settings, LogOut, LogIn } from 'lucide-svelte';
-	import { user, userActions, isAuthenticated } from '$lib/stores';
 	import AuthModal from '$lib/components/auth/AuthModal.svelte';
+
+	const auth = getContext('auth');
 	
 	let showAuthModal = false;
 	let authMode: 'login' | 'register' = 'login';
@@ -21,11 +23,7 @@
 	}
 	
 	async function handleLogout() {
-		try {
-			await userActions.logout();
-		} catch (error) {
-			console.error('Logout failed:', error);
-		}
+		await auth.logout();
 	}
 	
 	function handleAuthSuccess() {
@@ -33,18 +31,18 @@
 	}
 </script>
 
-{#if $isAuthenticated}
+{#if $auth.isAuthenticated}
 	<!-- Authenticated User Menu -->
 	<div class="dropdown dropdown-end">
 		<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
 			<div class="w-8 rounded-full bg-primary text-primary-content flex items-center justify-center text-sm font-medium">
-				{$user?.name?.[0]?.toUpperCase() || $user?.email?.[0]?.toUpperCase() || 'U'}
+				{$auth.user?.name?.[0]?.toUpperCase() || $auth.user?.email?.[0]?.toUpperCase() || 'U'}
 			</div>
 		</div>
 		<ul tabindex="0" class="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52 border border-base-300">
 			<li class="menu-title">
-				<span class="text-sm font-medium">{$user?.name || 'User'}</span>
-				<span class="text-xs opacity-60">{$user?.email || 'user@example.com'}</span>
+				<span class="text-sm font-medium">{$auth.user?.name || 'User'}</span>
+				<span class="text-xs opacity-60">{$auth.user?.email || 'user@example.com'}</span>
 			</li>
 			<div class="divider my-1"></div>
 			<li>

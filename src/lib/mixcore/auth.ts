@@ -72,7 +72,10 @@ export class AuthModule {
 
   private async saveTokenToStorage(tokenInfo: TokenInfo): Promise<void> {
     try {
-      const saved = await TokenService.setTokens(tokenInfo.access_token, tokenInfo.refresh_token);
+      const accessToken = (tokenInfo as any).accessToken || tokenInfo.access_token;
+      const refreshToken = (tokenInfo as any).refreshToken || tokenInfo.refresh_token;
+
+      const saved = await TokenService.setTokens(accessToken, refreshToken);
       if (!saved) {
         throw new Error('Failed to save tokens');
       }
@@ -165,6 +168,7 @@ export class AuthModule {
   }
 
   async initUserData(): Promise<User | null> {
+    return null;
     if (!this.isAuthenticated) {
       return null;
     }
@@ -176,7 +180,7 @@ export class AuthModule {
     } catch (error) {
       console.error('Failed to get user data:', error);
       // Don't clear tokens here, might be temporary network issue
-      return null;
+      return null;    
     }
   }
 
@@ -213,10 +217,10 @@ export class AuthModule {
     return this.tokenRefreshPromise;
   }
 
-  logout(callback?: () => void): void {
+  async logout(callback?: () => void): Promise<void> {
     // Optional: Call logout endpoint
     if (this.isAuthenticated) {
-      this.api.post('/rest/auth/logout/').catch(console.error);
+      await this.api.post('/rest/auth/logout/').catch(console.error);
     }
 
     // Clear local state
@@ -260,6 +264,17 @@ export class AuthModule {
     this._currentUser = response.data;
     
     return this._currentUser;
+  }
+
+  setToken(token: string, refreshToken: string): void {
+    this._tokenInfo = {
+      access_token: token,
+      refresh_token: refreshToken,
+      token_type: 'Bearer',
+      expires_in: 3600 // Default, should be updated from server
+    };
+
+    this.saveTokenToStorage(this._tokenInfo);
   }
 
   // Get current access token for API requests

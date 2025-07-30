@@ -25,6 +25,14 @@ export class MixcoreClient {
       endpoint,
       () => this.auth?.getAccessToken() || null
     );
+    this.apiClient.setAuthFailureHandler(async () => {
+      try {
+        const tokenInfo = await this.auth.refreshToken();
+        return !!tokenInfo;
+      } catch (error) {
+        return false;
+      }
+    });
 
     // Initialize modules
     this.auth = new AuthModule(

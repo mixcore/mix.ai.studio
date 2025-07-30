@@ -9,6 +9,11 @@ export async function injectAuthToken(tokenInfo: {
   expiresIn: number;
 }): Promise<boolean> {
   try {
+    console.log('Injecting auth tokens:', {
+      accessToken: tokenInfo.accessToken ? '***' : 'null',
+      refreshToken: tokenInfo.refreshToken ? '***' : 'null'
+    });
+
     // Store tokens using TokenService
     const tokensSaved = await TokenService.setTokens(tokenInfo.accessToken, tokenInfo.refreshToken);
     if (!tokensSaved) {
@@ -22,11 +27,15 @@ export async function injectAuthToken(tokenInfo: {
     });
 
     // Initialize auth state
+    console.log('Initializing auth state...');
     const success = await mixcoreService.initialize();
     
     // Dispatch custom event when auth state changes
     if (success && get(isAuthenticated)) {
+      console.log('Auth successful, dispatching auth-success event');
       window.dispatchEvent(new CustomEvent('auth-success'));
+    } else {
+      console.log('Auth initialization failed');
     }
     
     return success;
