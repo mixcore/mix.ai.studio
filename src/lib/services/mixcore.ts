@@ -77,16 +77,39 @@ class MixcoreService {
   // Authentication methods
   async login(email: string, password: string): Promise<User | null> {
     try {
+      console.log('🔑 MixcoreService: Starting login for:', email);
       const client = this.getClient();
       const tokenInfo = await client.auth.login({ email, password });
+      console.log('🔑 MixcoreService: Token received:', !!tokenInfo);
       
-      if (tokenInfo && client.auth.currentUser) {
-        return client.auth.currentUser as User;
+      if (tokenInfo) {
+        // Try to initialize user data (now uses the correct endpoint)
+        console.log('🔑 MixcoreService: Attempting to get user data via initUserData');
+        let userData = await client.auth.initUserData();
+        console.log('🔑 MixcoreService: initUserData result:', !!userData);
+        
+        if (!userData) {
+          // Fallback: fetch user profile directly from API
+          console.log('🔑 MixcoreService: Fallback to direct API call');
+          try {
+            userData = await this.fetchUserProfile();
+            console.log('🔑 MixcoreService: Direct API call result:', !!userData);
+          } catch (profileError) {
+            console.warn('🔑 MixcoreService: Failed to fetch user profile:', profileError);
+          }
+        }
+        
+        if (userData) {
+          console.log('✅ MixcoreService: Returning user data:', { id: userData.id, name: userData.name });
+          return userData as User;
+        }
+        
+        console.warn('⚠️ MixcoreService: Login successful but no user data available');
       }
       
       return null;
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('❌ MixcoreService: Login failed:', error);
       throw error;
     }
   }
@@ -103,10 +126,83 @@ class MixcoreService {
   async getCurrentUser(): Promise<User | null> {
     try {
       const client = this.getClient();
-      return await client.auth.initUserData() as User;
+      
+      // First try to get cached user data
+      let userData = client.auth.currentUser;
+      
+      // If no cached data and authenticated, fetch user data
+      if (!userData && this.isAuthenticated) {
+        userData = await client.auth.initUserData();
+      }
+      
+      // If still no data, try direct API call as fallback
+      if (!userData && this.isAuthenticated) {
+        userData = await this.fetchUserProfile();
+      }
+      
+      return userData as User | null;
     } catch (error) {
       console.error('Failed to get current user:', error);
       return null;
+    }
+  }
+
+  private async fetchUserProfile(): Promise<User | null> {
+    try {
+      console.log('🌐 fetchUserProfile: Starting direct API call');
+      const client = this.getClient();
+      
+      // Debug token info state
+      console.log('🌐 fetchUserProfile: Client auth tokenInfo:', !!client.auth.tokenInfo);
+      console.log('🌐 fetchUserProfile: Client isAuthenticated:', client.auth.isAuthenticated);
+      
+      let token = client.auth.getAccessToken();
+      console.log('🌐 fetchUserProfile: Initial token check:', token ? 'Token found' : 'No token');
+      
+      // If no token, wait a bit and try again (timing issue)
+      if (!token) {
+        console.log('🌐 fetchUserProfile: No token found, waiting 100ms and retrying...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        token = client.auth.getAccessToken();
+        console.log('🌐 fetchUserProfile: Second token check:', token ? 'Token found' : 'No token');
+      }
+      
+      // If still no token, try to get it from tokenInfo directly
+      if (!token && client.auth.tokenInfo) {
+        token = client.auth.tokenInfo.access_token;
+        console.log('🌐 fetchUserProfile: Token from tokenInfo:', token ? 'Token found directly' : 'No token in tokenInfo');
+      }
+      
+      if (!token) {
+        throw new Error('No access token available after all attempts');
+      }
+
+      const url = `${this.config.endpoint}/rest/auth/user/my-profile`;
+      console.log('🌐 fetchUserProfile: Calling URL:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json, text/plain, */*',
+          'authorization': `Bearer ${token}`,
+          'cache-control': 'no-cache',
+          'pragma': 'no-cache',
+        },
+      });
+
+      console.log('🌐 fetchUserProfile: Response status:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user profile: ${response.status} ${response.statusText}`);
+      }
+
+      const userData = await response.json();
+      console.log('🌐 fetchUserProfile: Response data:', userData ? 'Data received' : 'No data');
+      
+      return userData as User;
+    } catch (error) {
+      console.error('🌐 fetchUserProfile: Failed to fetch user profile:', error);
+      throw error;
     }
   }
 
@@ -274,4 +370,8 @@ class MixcoreService {
 export const mixcoreService = new MixcoreService();
 
 // Export types for use in components
-export type { Project, ChatMessage, User };
+export type { 
+  Project as MixcoreProject, 
+  ChatMessage as MixcoreChatMessage, 
+  User as MixcoreServiceUser 
+};

@@ -6,6 +6,8 @@ export interface AuthState {
   user: User | null;
   loading: boolean;
   error: Error | null;
+  lastActivity: number | null;
+  tokenExpiry: number | null;
 }
 
 function createAuthStore() {
@@ -14,19 +16,29 @@ function createAuthStore() {
     user: null,
     loading: true,
     error: null,
+    lastActivity: null,
+    tokenExpiry: null,
   });
 
   async function initialize() {
     try {
       const initialized = await mixcoreService.initialize();
+      const now = Date.now();
+      
       if (initialized) {
         const currentUser = mixcoreService.currentUser;
-        if (currentUser) {
+        const tokenInfo = await mixcoreService.getClient().auth.tokenInfo;
+        
+        if (currentUser && tokenInfo) {
+          const tokenExpiry = tokenInfo.expires_in ? now + (tokenInfo.expires_in * 1000) : null;
+          
           set({
             isAuthenticated: true,
             user: currentUser,
             loading: false,
             error: null,
+            lastActivity: now,
+            tokenExpiry,
           });
         } else {
           set({
@@ -34,13 +46,8 @@ function createAuthStore() {
             user: null,
             loading: false,
             error: null,
-          });
-        } else {
-          set({
-            isAuthenticated: false,
-            user: null,
-            loading: false,
-            error: null,
+            lastActivity: null,
+            tokenExpiry: null,
           });
         }
       } else {
@@ -49,17 +56,20 @@ function createAuthStore() {
           user: null,
           loading: false,
           error: null,
+          lastActivity: null,
+          tokenExpiry: null,
         });
       }
     } catch (error) {
+      console.error('Auth initialization failed:', error);
       set({
         isAuthenticated: false,
         user: null,
         loading: false,
         error: error as Error,
+        lastActivity: null,
+        tokenExpiry: null,
       });
-    } finally {
-      update(state => ({ ...state, loading: false }));
     }
   }
 
@@ -67,33 +77,75 @@ function createAuthStore() {
     try {
       update(state => ({ ...state, loading: true, error: null }));
       const user = await mixcoreService.login(email, password);
+      const now = Date.now();
+      
       if (user) {
+        // Get token expiry information
+        const tokenInfo = mixcoreService.getClient().auth.tokenInfo;
+        const tokenExpiry = tokenInfo?.expires_in ? now + (tokenInfo.expires_in * 1000) : null;
+        
         set({
           isAuthenticated: true,
           user,
           loading: false,
           error: null,
+          lastActivity: now,
+          tokenExpiry,
+        });
+      } else {
+        console.warn('⚠️ Login succeeded but no user data received - this should not happen with the new implementation');
+        set({
+          isAuthenticated: false,
+          user: null,
+          loading: false,
+          error: new Error('Login succeeded but no user data received'),
+          lastActivity: null,
+          tokenExpiry: null,
         });
       }
     } catch (error) {
+      console.error('❌ Login failed:', error);
       set({
         isAuthenticated: false,
         user: null,
         loading: false,
         error: error as Error,
+        lastActivity: null,
+        tokenExpiry: null,
       });
       throw error;
     }
   }
 
   async function logout() {
-    await mixcoreService.logout();
-    set({
-      isAuthenticated: false,
-      user: null,
-      loading: false,
-      error: null,
-    });
+    try {
+      await mixcoreService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      set({
+        isAuthenticated: false,
+        user: null,
+        loading: false,
+        error: null,
+        lastActivity: null,
+        tokenExpiry: null,
+      });
+    }
+  }
+
+  // Helper function to update activity timestamp
+  function updateActivity() {
+    update(state => ({
+      ...state,
+      lastActivity: Date.now()
+    }));
+  }
+
+  // Helper function to check if session is expired
+  function isSessionExpired(state: AuthState): boolean {
+    if (!state.tokenExpiry) return false;
+    return Date.now() >= state.tokenExpiry;
   }
 
   return {
@@ -101,6 +153,8 @@ function createAuthStore() {
     initialize,
     login,
     logout,
+    updateActivity,
+    isSessionExpired,
   };
 }
 

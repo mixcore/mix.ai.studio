@@ -6,7 +6,7 @@ This is a web-based AI-powered development platform similar to AI build UI, wher
 
 ## Tech Stack
 
-- **Framework**: SvelteKit with TypeScript
+- **Framework**: Svelte 5, SvelteKit 2 with TypeScript
 - **Styling**: Tailwind CSS v4 + daisyUI v5
 - **UI Components**: daisyUI component system
 - **Icons**: Lucide Svelte

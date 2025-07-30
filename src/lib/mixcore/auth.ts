@@ -6,8 +6,11 @@ import type {
 } from './types';
 import { 
   validateRequired, 
-  validateEmail, 
-  validateMinLength 
+  validateLoginCredentials,
+  validateRegistrationCredentials,
+  validateMinLength,
+  validateEmail,
+  isEmailFormat
 } from './helpers';
 import type { ApiClient } from './api';
 import { TokenService } from '$lib/services/token';
@@ -18,8 +21,6 @@ export interface AuthCallbacks {
   finally?: () => void;
 }
 
-// A simple helper to distinguish email from username
-const isEmailFormat = (input: string): boolean => !!input && input.includes('@');
 
 export class AuthModule {
   private _tokenInfo: TokenInfo | null = null;
@@ -30,8 +31,8 @@ export class AuthModule {
 
   constructor(
     private api: ApiClient,
-    private tokenKey: string,
-    private refreshTokenKey: string,
+    tokenKey: string, // Not used directly anymore, kept for interface compatibility
+    refreshTokenKey: string, // Not used directly anymore, kept for interface compatibility
     private onAuthSuccess?: () => void,
     private onAuthError?: () => void
   ) {
@@ -52,21 +53,22 @@ export class AuthModule {
 
   private async loadTokenFromStorage(): Promise<void> {
     try {
-      const [token, refreshToken] = await Promise.all([
-        TokenService.getAccessToken(),
-        TokenService.getRefreshToken()
-      ]);
+      // Use the enhanced TokenService method that includes validation and metadata
+      const tokenInfo = await TokenService.getTokenInfo();
       
-      if (token && refreshToken) {
-        this._tokenInfo = {
-          access_token: token,
-          refresh_token: refreshToken,
-          token_type: 'Bearer',
-          expires_in: 3600 // Default, should be updated from server
-        };
+      if (tokenInfo) {
+        // Check if tokens are expired
+        const expired = await TokenService.areTokensExpired();
+        if (!expired) {
+          this._tokenInfo = tokenInfo;
+        } else {
+          console.log('Tokens are expired, clearing storage');
+          await this.clearTokenFromStorage();
+        }
       }
     } catch (error) {
       console.warn('Failed to load token from storage:', error);
+      await this.clearTokenFromStorage(); // Cleanup on error
     }
   }
 
@@ -74,14 +76,16 @@ export class AuthModule {
     try {
       const accessToken = (tokenInfo as any).accessToken || tokenInfo.access_token;
       const refreshToken = (tokenInfo as any).refreshToken || tokenInfo.refresh_token;
+      const expiresIn = tokenInfo.expires_in;
 
-      const saved = await TokenService.setTokens(accessToken, refreshToken);
+      const saved = await TokenService.setTokens(accessToken, refreshToken, expiresIn);
       if (!saved) {
         throw new Error('Failed to save tokens');
       }
       this._tokenInfo = tokenInfo;
     } catch (error) {
       console.error('Failed to save token to storage:', error);
+      throw error; // Re-throw to handle upstream
     }
   }
 
@@ -104,32 +108,39 @@ export class AuthModule {
   ): Promise<TokenInfo> {
     let tokenInfo: TokenInfo;
     try {
-      // The incoming credentials might have `email` or `usernameOrEmail`.
-      // We handle both to make the module robust. The `email` property is
-      // likely being used as a generic identifier field.
       const identifier = (credentials as any).email || (credentials as any).usernameOrEmail;
       const { password } = credentials;
-      // Validate input
-      validateRequired(identifier, 'Username or Email');
-      validateMinLength(password, 6, 'Password');
-      const payload: { password: string; email?: string; userName?: string } = { password };
-      if (isEmailFormat(identifier)) {
-        validateEmail(identifier);
-        payload.email = identifier;
-      } else {
-        // Assuming it's a username if it's not in email format.
-        payload.userName = identifier;
+      
+      // Enhanced validation using new validation helpers
+      const validationResults = validateLoginCredentials(identifier, password);
+      const errors = validationResults.filter(result => !result.isValid);
+      
+      if (errors.length > 0) {
+        throw new Error(errors.map(error => error.error).join(', '));
       }
-      // Make login request
+      
+      // Use the exact format from the working curl example
+      const payload = {
+        email: isEmailFormat(identifier) ? identifier : "", // Use actual email or empty string
+        userName: isEmailFormat(identifier) ? "" : identifier, // Use actual username or empty string  
+        phoneNumber: "", // Empty string for optional field
+        password: password,
+        rememberMe: true,
+        returnUrl: "" // Empty string for optional field
+      };
+      
+      console.log('🔐 Auth: Login payload:', JSON.stringify(payload, null, 2));
       const response = await this.api.post<TokenInfo>('/rest/auth/user/login-unsecure', payload);
       tokenInfo = response.data;
-      // Save token
-      this.saveTokenToStorage(tokenInfo);
+      
+      // Save token with enhanced storage
+      await this.saveTokenToStorage(tokenInfo);
+      
       // Get user data
       await this.initUserData();
     } catch (error) {
       // Clear any partial auth state
-      this.logout();
+      await this.logout();
       callbacks?.error?.(error as Error);
       this.onAuthError?.();
       callbacks?.finally?.();
@@ -137,12 +148,10 @@ export class AuthModule {
       if (error instanceof Error && error.message.includes('HTTP Error')) {
         throw new Error('Login failed. Please check your credentials and ensure the API server is reachable.');
       }
-      throw error; // Re-throw original error for other cases
+      throw error;
     }
 
-    // If we reach here, the try block was successful.
-    // Call success callbacks outside the try...catch block to prevent their errors
-    // from being caught by our authentication logic.
+    // Success callbacks
     callbacks?.success?.(tokenInfo);
     this.onAuthSuccess?.();
     callbacks?.finally?.();
@@ -151,30 +160,36 @@ export class AuthModule {
   }
 
   async register(credentials: RegisterCredentials): Promise<User> {
-    // Validate input
-    validateRequired(credentials.username, 'Username');
-    validateEmail(credentials.email);
-    validateMinLength(credentials.password, 6, 'Password');
+    // Enhanced validation using new validation helpers
+    const validationResults = validateRegistrationCredentials(
+      credentials.username,
+      credentials.email,
+      credentials.password
+    );
+    
+    const errors = validationResults.filter(result => !result.isValid);
+    if (errors.length > 0) {
+      throw new Error(errors.map(error => error.error).join(', '));
+    }
 
-      // Construct payload with correct key casing
-      const payload = {
-        username: credentials.username,
-        email: credentials.email,
-        password: credentials.password
-      };
+    // Construct payload with correct key casing
+    const payload = {
+      username: credentials.username,
+      email: credentials.email,
+      password: credentials.password
+    };
 
     const response = await this.api.post<User>('/rest/auth/register/', payload);
     return response.data;
   }
 
   async initUserData(): Promise<User | null> {
-    return null;
     if (!this.isAuthenticated) {
       return null;
     }
 
     try {
-      const response = await this.api.get<User>('/rest/auth/me/');
+      const response = await this.api.get<User>('/rest/auth/user/my-profile');
       this._currentUser = response.data;
       return this._currentUser;
     } catch (error) {
@@ -247,7 +262,10 @@ export class AuthModule {
 
     const payload: { email?: string; username?: string } = {};
     if (isEmailFormat(usernameOrEmail)) {
-      validateEmail(usernameOrEmail);
+      const emailValidation = validateEmail(usernameOrEmail);
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.error || 'Invalid email format');
+      }
       payload.email = usernameOrEmail;
     } else {
       payload.username = usernameOrEmail;

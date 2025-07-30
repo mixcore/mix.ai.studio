@@ -5,8 +5,12 @@
 	import { setContext } from 'svelte';
 	import { auth } from '$lib/stores/auth';
 
-	onMount(() => {
-		auth.initialize();
+	onMount(async () => {
+		try {
+			await auth.initialize();
+		} catch (error) {
+			console.error('Failed to initialize auth:', error);
+		}
 	});
 
 	setContext('auth', auth);

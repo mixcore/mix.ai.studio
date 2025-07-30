@@ -7,7 +7,6 @@
 	import AgentFlowPanel from '$lib/components/agent/AgentFlowPanel.svelte';
 	import VscodePanel from '$lib/components/vscode/VscodePanel.svelte';
 	import FloatingChatToggle from '$lib/components/navigation/FloatingChatToggle.svelte';
-	import { onMount } from 'svelte';
 	import { getContext } from 'svelte';
 	import { previewUrl, viewMode } from '$lib/stores';
 	import WelcomeScreen from '$lib/components/welcome/WelcomeScreen.svelte';
@@ -18,10 +17,10 @@
 
 	const auth: AuthStore = getContext('auth');
 
-	let showAuthModal = false;
-	let authMode: 'login' | 'register' = 'login';
+	let showAuthModal = $state(false);
+	let authMode = $state<'login' | 'register'>('login');
 
-	onMount(() => {
+	$effect(() => {
 		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
 		previewUrl.set(endpoint || 'https://mixcore.net');
 	});

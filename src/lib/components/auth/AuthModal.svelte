@@ -16,9 +16,16 @@
 	
 	async function handleLogin(event: CustomEvent<{ email: string; password: string }>) {
 		const { email, password } = event.detail;
-		await auth.login(email, password);
-		dispatch('success', { user: $auth.user });
-		dispatch('close');
+		try {
+			await auth.login(email, password);
+			// Wait for the store to update before dispatching
+			if ($auth.isAuthenticated && $auth.user) {
+				dispatch('success', { user: $auth.user });
+				dispatch('close');
+			}
+		} catch (error) {
+			console.error('Login error in modal:', error);
+		}
 	}
 	
 	async function handleRegister(event: CustomEvent<{ username: string; email: string; password: string }>) {
@@ -30,8 +37,11 @@
       const client = mixcoreService.mixcoreService.getClient();
       await client.auth.register({ username, email, password });
       await auth.login(email, password);
-      dispatch('success', { user: $auth.user });
-      dispatch('close');
+      // Wait for the store to update before dispatching
+      if ($auth.isAuthenticated && $auth.user) {
+        dispatch('success', { user: $auth.user });
+        dispatch('close');
+      }
     } catch (err) {
       console.error('Registration error:', err);
     }
