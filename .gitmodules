@@ -1,0 +1,3 @@
+[submodule "lib/sdk-client"]
+	path = lib/sdk-client
+	url = https://github.com/mixcore/sdk-client.git

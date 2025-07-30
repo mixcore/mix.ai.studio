@@ -30,9 +30,11 @@ export interface SupabaseConnection {
 export interface ChatMessage {
 	id: string;
 	content: string;
-	role: 'user' | 'assistant';
-	timestamp: Date;
+	role: 'user' | 'assistant' | 'system';
+	timestamp: string;
 	attachments?: string[];
+	projectId?: string;
+	metadata?: Record<string, any>;
 }
 
 export interface Workspace {

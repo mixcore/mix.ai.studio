@@ -9,7 +9,8 @@
 		navigator.clipboard.writeText(message.content);
 	}
 
-	function formatTimestamp(date: Date) {
+	function formatTimestamp(timestamp: string | Date) {
+		const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
 		return new Intl.DateTimeFormat('en-US', {
 			hour: '2-digit',
 			minute: '2-digit'

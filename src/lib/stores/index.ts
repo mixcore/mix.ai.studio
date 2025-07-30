@@ -1,6 +1,14 @@
 import { writable, derived, get } from 'svelte/store';
 import type { Workspace } from '$lib/types';
 import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/services/mixcore';
+import { createLLMService, type LLMProvider } from '$lib/services/llm';
+import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
+import { initializeSDK } from '$lib/sdk/client';
+
+// Initialize services
+export const sdkClient = initializeSDK();
+export const llmService = createLLMService();
+export const databaseService = createDatabaseService();
 
 export const user = writable<User | null>(null);
 export const currentProject = writable<Project | null>(null);
@@ -11,14 +19,30 @@ export const chatLoading = writable(false);
 export const chatMode = writable<'default' | 'chat-only' | 'agent'>('default');
 export const chatInput = writable('');
 
-// New type for LLM Model
+// LLM Integration
+export const llmProviders = writable<Record<string, LLMProvider>>({});
+export const selectedLLMProvider = writable<string>('openai');
+export const selectedLLMModel = writable<string>('gpt-3.5-turbo');
+export const llmSettings = writable({
+  temperature: 0.7,
+  maxTokens: 4000,
+  enableMCP: true
+});
+
+// Database Integration
+export const databaseTables = writable<TableInfo[]>([]);
+export const databaseStats = writable<DatabaseStats | null>(null);
+export const selectedTable = writable<TableInfo | null>(null);
+export const databaseLoading = writable(false);
+
+// New type for LLM Model (legacy compatibility)
 export type LLMModel = {
 	id: string;
 	name: string;
 	provider: 'OpenAI' | 'Anthropic' | 'Google' | 'Groq' | 'DeepSeek' | 'Mistral';
 };
 
-// List of available models
+// List of available models (legacy compatibility)
 export const availableModels: LLMModel[] = [
 	{ id: 'gpt-4o', name: 'ChatGPT 4o', provider: 'OpenAI' },
 	{ id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },

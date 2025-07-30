@@ -47,6 +47,8 @@ export interface QueryOptions {
   selectColumns?: string[];
 }
 
+import type { MixQuery } from './query';
+
 export interface ExportOptions {
   format?: 'csv' | 'json' | 'xlsx';
   query?: MixQuery;

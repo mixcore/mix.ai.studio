@@ -78,7 +78,11 @@ export class FlowExecutionEngine {
 				this.context.variables[`node_${node.id}`] = nodeResult;
 
 				// Find next node
-				currentNodeId = await this.getNextNode(node, nodeResult);
+				const nextNodeId = await this.getNextNode(node, nodeResult);
+				if (nextNodeId === null) {
+					break; // End of flow
+				}
+				currentNodeId = nextNodeId;
 			}
 
 			const executionTime = Date.now() - this.context.startTime;
