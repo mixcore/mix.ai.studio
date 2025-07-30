@@ -11,7 +11,10 @@
 		"preview:ssl": "vite preview --https",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"serena": "serena",
+		"serena:run": "serena run",
+		"serena:list": "serena list"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -38,6 +41,8 @@
 	},
 	"dependencies": {
 		"@monaco-editor/loader": "^1.5.0",
+		"@types/aes-js": "^3.1.4",
+		"aes-js": "^3.1.2",
 		"axios": "^1.11.0",
 		"clsx": "^2.1.1",
 		"crypto-js": "^4.2.0",

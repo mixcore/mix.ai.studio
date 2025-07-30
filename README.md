@@ -36,3 +36,45 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+# Mix.AI.Studio
+
+## Serena AI Agent CLI
+
+[Serena](https://github.com/oraios/serena) is a CLI tool for managing and running AI agents.
+
+### Installation
+
+You can install Serena globally:
+
+```sh
+npm install -g serena
+```
+
+Or as a dev dependency in your project:
+
+```sh
+npm install --save-dev serena
+```
+
+### Usage
+
+After installation, you can use the `serena` CLI:
+
+```sh
+serena --help
+```
+
+To run an agent:
+
+```sh
+serena run <agent>
+```
+
+To list available agents:
+
+```sh
+serena list
+```
+
+For more details, see the [Serena documentation](https://github.com/oraios/serena).

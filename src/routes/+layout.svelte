@@ -4,6 +4,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { userActions, isAuthenticated, mixcoreService } from '$lib/stores';
 	import { get } from 'svelte/store';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	
 	// Import auth persistence test in development
 	if (import.meta.env.DEV) {
@@ -11,6 +13,18 @@
 	}
 
 	let visibilityChangeHandler: () => void;
+
+	// Client-side auth state fallback
+	$: {
+		if (typeof window !== 'undefined') {
+			// Only handle cases that might have slipped through server-side
+			if ($page.url.pathname !== '/welcome' && !$isAuthenticated && !import.meta.env.VITE_DEMO_MODE) {
+				goto('/welcome');
+			} else if ($page.url.pathname === '/welcome' && $isAuthenticated) {
+				goto('/');
+			}
+		}
+	}
 
 	// Initialize authentication state on page load
 	onMount(async () => {
@@ -26,7 +40,7 @@
 				// Check if auth is still valid when tab becomes visible
 				try {
 					const client = mixcoreService.getClient();
-					if (client.auth.isAuthenticated) {
+					if (client.auth.tokenInfo?.accessToken) {
 						// Refresh user data to ensure it's current
 						await client.auth.initUserData();
 					}

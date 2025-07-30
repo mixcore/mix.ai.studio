@@ -1,12 +1,8 @@
 <script lang="ts">
 	import { ArrowRight, Sparkles } from 'lucide-svelte';
-	import { createEventDispatcher } from 'svelte';
 	import { isAuthenticated } from '$lib/stores';
-	
-	const dispatch = createEventDispatcher<{
-		getStarted: void;
-		login: void;
-	}>();
+
+	let { onLogin, onGetStarted } = $props();
 </script>
 
 <div class="flex max-h-[100vh] min-h-[100vh] flex-col items-center justify-center overflow-hidden px-7 text-center antialiased">
@@ -38,7 +34,7 @@
 	{#if $isAuthenticated}
 		<button
 			class="btn btn-primary h-12 px-6 rounded-2xl font-bold text-base z-10 w-full max-w-[18.75rem] group hover:scale-105 transition-transform duration-200"
-			on:click={() => dispatch('getStarted')}
+			on:click={() => onGetStarted?.()}
 		>
 			<Sparkles class="w-4 h-4 mr-2" />
 			Start Building
@@ -47,7 +43,7 @@
 	{:else}
 		<button
 			class="btn btn-primary h-12 px-6 rounded-2xl font-bold text-base z-10 w-full max-w-[18.75rem] group hover:scale-105 transition-transform duration-200"
-			on:click={() => dispatch('login')}
+			on:click|preventDefault={() => dispatch('login')}
 		>
 			Get Started
 			<ArrowRight class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
