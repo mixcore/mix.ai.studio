@@ -1,6 +1,8 @@
 import { writable, derived, get } from 'svelte/store';
 import type { Workspace } from '$lib/types';
 import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/services/mixcore';
+// Re-export for external access
+export { mixcoreService };
 import { createLLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
 import { initializeSDK } from '$lib/sdk/client';
@@ -78,6 +80,14 @@ export const userActions = {
       if (mixcoreUser) {
         user.set(mixcoreUser);
         mixcoreConnected.set(true);
+        
+        // Load projects after successful login
+        try {
+          await projectActions.loadProjects();
+        } catch (projectError) {
+          console.warn('Failed to load projects after login:', projectError);
+        }
+        
         return true;
       }
       return false;
@@ -96,7 +106,7 @@ export const userActions = {
     mixcoreConnected.set(false);
   },
 
-  async initialize() {
+  async initialize(retries = 3, delay = 1000) {
     try {
       const initialized = await mixcoreService.initialize();
       if (initialized) {
@@ -104,6 +114,8 @@ export const userActions = {
         if (currentUser) {
           user.set(currentUser);
           mixcoreConnected.set(true);
+          console.log('✅ Auth state restored from storage');
+          
           // Try to load projects, but don't fail if it errors
           try {
             await projectActions.loadProjects();
@@ -115,7 +127,20 @@ export const userActions = {
       return initialized;
     } catch (error) {
       console.error('Initialization error:', error);
-      // Reset to safe state
+      
+      // Retry logic for network issues
+      if (retries > 0 && (error as any)?.statusCode >= 500) {
+        console.log(`⏳ Retrying authentication initialization in ${delay}ms... (${retries} retries left)`);
+        
+        return new Promise(resolve => {
+          setTimeout(async () => {
+            const result = await this.initialize(retries - 1, delay * 2);
+            resolve(result);
+          }, delay);
+        });
+      }
+      
+      // Reset to safe state on permanent failure
       user.set(null);
       mixcoreConnected.set(false);
       return false;

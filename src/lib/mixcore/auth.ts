@@ -53,6 +53,8 @@ export class AuthModule {
     try {
       const token = localStorage.getItem(this.tokenKey);
       const refreshToken = localStorage.getItem(this.refreshTokenKey);
+      const expiresAt = localStorage.getItem(`${this.tokenKey}_expires_at`);
+      const userDataStr = localStorage.getItem(`${this.tokenKey}_user`);
       
       if (token && refreshToken) {
         this._tokenInfo = {
@@ -61,6 +63,37 @@ export class AuthModule {
           token_type: 'Bearer',
           expires_in: 3600 // Default, should be updated from server
         };
+
+        // Restore user data if available
+        if (userDataStr) {
+          try {
+            this._currentUser = JSON.parse(userDataStr);
+          } catch (parseError) {
+            console.warn('Failed to parse stored user data:', parseError);
+          }
+        }
+
+        // Check if token is expired and schedule refresh if needed
+        if (expiresAt) {
+          const expirationTime = parseInt(expiresAt);
+          const now = Date.now();
+          
+          if (now >= expirationTime) {
+            // Token is expired, attempt refresh
+            console.log('Stored token is expired, attempting refresh...');
+            this.refreshToken().catch(error => {
+              console.warn('Failed to refresh expired token:', error);
+            });
+          } else {
+            // Schedule refresh before token expires (5 minutes before)
+            const timeToRefresh = expirationTime - now - (5 * 60 * 1000);
+            if (timeToRefresh > 0) {
+              setTimeout(() => {
+                this.refreshToken().catch(console.warn);
+              }, timeToRefresh);
+            }
+          }
+        }
       }
     } catch (error) {
       console.warn('Failed to load token from storage:', error);
@@ -71,7 +104,25 @@ export class AuthModule {
     try {
       localStorage.setItem(this.tokenKey, tokenInfo.access_token);
       localStorage.setItem(this.refreshTokenKey, tokenInfo.refresh_token);
+      
+      // Calculate and store expiration time
+      const expiresAt = Date.now() + (tokenInfo.expires_in * 1000);
+      localStorage.setItem(`${this.tokenKey}_expires_at`, expiresAt.toString());
+      
+      // Store user data if available
+      if (this._currentUser) {
+        localStorage.setItem(`${this.tokenKey}_user`, JSON.stringify(this._currentUser));
+      }
+      
       this._tokenInfo = tokenInfo;
+
+      // Schedule token refresh 5 minutes before expiration
+      const timeToRefresh = (tokenInfo.expires_in - 300) * 1000; // 5 minutes before expiry
+      if (timeToRefresh > 0) {
+        setTimeout(() => {
+          this.refreshToken().catch(console.warn);
+        }, timeToRefresh);
+      }
     } catch (error) {
       console.error('Failed to save token to storage:', error);
     }
@@ -81,6 +132,8 @@ export class AuthModule {
     try {
       localStorage.removeItem(this.tokenKey);
       localStorage.removeItem(this.refreshTokenKey);
+      localStorage.removeItem(`${this.tokenKey}_expires_at`);
+      localStorage.removeItem(`${this.tokenKey}_user`);
       this._tokenInfo = null;
       this._currentUser = null;
     } catch (error) {
@@ -165,10 +218,23 @@ export class AuthModule {
     try {
       const response = await this.api.get<User>('/rest/auth/me/');
       this._currentUser = response.data;
+      
+      // Save user data to localStorage for persistence
+      if (this._currentUser) {
+        try {
+          localStorage.setItem(`${this.tokenKey}_user`, JSON.stringify(this._currentUser));
+        } catch (storageError) {
+          console.warn('Failed to store user data:', storageError);
+        }
+      }
+      
       return this._currentUser;
     } catch (error) {
       console.error('Failed to get user data:', error);
-      // Don't clear tokens here, might be temporary network issue
+      // If we have cached user data, return it instead of null
+      if (this._currentUser) {
+        return this._currentUser;
+      }
       return null;
     }
   }

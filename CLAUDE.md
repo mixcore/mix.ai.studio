@@ -57,13 +57,13 @@ The SDK provides native Svelte adapters for both traditional stores and Svelte 5
 
 ```typescript
 // Svelte 4 Traditional Stores
-import { createAuthStore, createDataStore } from '@mixcore/sdk-client/adapters/svelte';
+import { createAuthStore, createDataStore } from '$lib/sdk-client/packages/sdk-client/src/adapters/svelte';
 
 // Svelte 5 Runes API  
-import { createAuthRunes, createDataRunes } from '@mixcore/sdk-client/adapters/svelte';
+import { createAuthRunes, createDataRunes } from '$lib/sdk-client/packages/sdk-client/src/adapters/svelte';
 
 // SvelteKit SSR Support
-import { createSvelteKitClient, loadMixcoreData } from '@mixcore/sdk-client/adapters/sveltekit';
+import { createSvelteKitClient, loadMixcoreData } from '$lib/sdk-client/packages/sdk-client/src/adapters/sveltekit';
 ```
 
 #### LLM Service Integration
@@ -141,23 +141,23 @@ src/
 │   ├── types/
 │   │   └── index.ts                   # TypeScript interfaces
 │   └── utils.ts                       # Utility functions (cn helper)
-├── lib/sdk-client/                    # Mixcore SDK Client submodule
-│   ├── packages/sdk-client/           # Core SDK package
-│   │   ├── src/                       # SDK source code
-│   │   │   ├── client.ts              # Main MixcoreClient class
-│   │   │   ├── auth.ts                # Authentication module
-│   │   │   ├── database.ts            # Database operations
-│   │   │   ├── storage.ts             # File storage module
-│   │   │   ├── query/                 # MixQuery builder
-│   │   │   ├── adapters/              # Framework integrations
-│   │   │   │   ├── svelte.ts          # Svelte stores & runes
-│   │   │   │   ├── sveltekit.ts       # SvelteKit SSR support
-│   │   │   │   ├── react.ts           # React hooks
-│   │   │   │   ├── vue.ts             # Vue composables
-│   │   │   │   └── angular.ts         # Angular services
-│   │   │   └── helpers/               # Utilities and validation
-│   │   └── examples/                  # Framework integration examples
-│   └── wiki/                          # SDK documentation
+│   ├── sdk-client/                    # Mixcore SDK Client submodule
+│   │   ├── packages/sdk-client/       # Core SDK package
+│   │   │   ├── src/                   # SDK source code
+│   │   │   │   ├── client.ts          # Main MixcoreClient class
+│   │   │   │   ├── auth.ts            # Authentication module
+│   │   │   │   ├── database.ts        # Database operations
+│   │   │   │   ├── storage.ts         # File storage module
+│   │   │   │   ├── query/             # MixQuery builder
+│   │   │   │   ├── adapters/          # Framework integrations
+│   │   │   │   │   ├── svelte.ts      # Svelte stores & runes
+│   │   │   │   │   ├── sveltekit.ts   # SvelteKit SSR support
+│   │   │   │   │   ├── react.ts       # React hooks
+│   │   │   │   │   ├── vue.ts         # Vue composables
+│   │   │   │   │   └── angular.ts     # Angular services
+│   │   │   │   └── helpers/           # Utilities and validation
+│   │   │   └── examples/              # Framework integration examples
+│   │   └── wiki/                      # SDK documentation
 └── static/
     └── favicon.svg                    # App icon
 ```
@@ -167,7 +167,7 @@ src/
 ### Authentication Flow
 ```typescript
 import { createSDKClient, initializeSDK } from '$lib/sdk/client';
-import { createAuthRunes } from '@mixcore/sdk-client/adapters/svelte';
+import { createAuthRunes } from '$lib/sdk-client/packages/sdk-client/src/adapters/svelte';
 
 // Initialize SDK with environment config
 const client = initializeSDK();
@@ -188,7 +188,7 @@ if (auth.isAuthenticated()) {
 
 ### Database Operations
 ```typescript
-import { MixQuery } from '@mixcore/sdk-client';
+import { MixQuery } from '$lib/sdk-client/packages/sdk-client/src/query';
 
 // Query with filtering and pagination
 const query = new MixQuery()
@@ -253,7 +253,7 @@ git submodule update --init --recursive
 bun install
 
 # Install SDK client dependencies
-cd lib/sdk-client && pnpm install && cd ../..
+cd src/lib/sdk-client && pnpm install && cd ../../..
 ```
 
 ### Development Commands
@@ -281,7 +281,7 @@ bun run check
 ### SDK Client Development
 ```bash
 # Build SDK client
-cd lib/sdk-client
+cd src/lib/sdk-client
 pnpm build
 
 # Run SDK tests
