@@ -8,6 +8,7 @@
 	import VscodePanel from '$lib/components/vscode/VscodePanel.svelte';
 	import FloatingChatToggle from '$lib/components/navigation/FloatingChatToggle.svelte';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { user, previewUrl, userActions, mixcoreConnected, isAuthenticated, hasProjects, viewMode } from '$lib/stores';
 	import WelcomeScreen from '$lib/components/welcome/WelcomeScreen.svelte';
 	import AuthModal from '$lib/components/auth/AuthModal.svelte';
@@ -22,6 +23,12 @@
 		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
 		previewUrl.set(endpoint || 'https://mixcore.net');
 
+		// Check if we have a stored user before trying to initialize
+		const storedUser = get(user);
+		if (storedUser) {
+			console.log('Found stored user, attempting to restore session');
+		}
+
 		// Initialize Mixcore service with better error handling
 		try {
 			const initialized = await userActions.initialize();
@@ -34,7 +41,11 @@
 			console.error('Failed to initialize Mixcore:', error);
 			// Ensure we're in a safe state even if initialization fails
 			mixcoreConnected.set(false);
-			user.set(null);
+			
+			// Only clear user if the error indicates invalid tokens
+			if (error instanceof Error && error.message.includes('authentication')) {
+				user.set(null);
+			}
 			
 			// Show a toast or notification to the user (optional)
 			if (error instanceof Error && error.message.includes('HTTP Error')) {

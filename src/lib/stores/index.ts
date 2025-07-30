@@ -4,13 +4,15 @@ import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/
 import { createLLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
 import { initializeSDK } from '$lib/sdk/client';
+import { persistentStore } from './persistent';
 
 // Initialize services
 export const sdkClient = initializeSDK();
 export const llmService = createLLMService();
 export const databaseService = createDatabaseService();
 
-export const user = writable<User | null>(null);
+// Create persistent user store that survives page refreshes
+export const user = persistentStore<User | null>('mix_user_state', null);
 export const currentProject = writable<Project | null>(null);
 export const workspace = writable<Workspace | null>(null);
 
@@ -78,26 +80,48 @@ export const userActions = {
       if (mixcoreUser) {
         user.set(mixcoreUser);
         mixcoreConnected.set(true);
+        
+        // Load projects after successful login
+        try {
+          await projectActions.loadProjects();
+        } catch (projectError) {
+          console.warn('Failed to load projects after login:', projectError);
+        }
+        
+        console.log('User logged in successfully');
         return true;
       }
       return false;
     } catch (error) {
       console.error('Login failed:', error);
+      // Clear any partial auth state on login failure
+      user.set(null);
+      mixcoreConnected.set(false);
       return false;
     }
   },
 
   async logout() {
-    await mixcoreService.logout();
-    user.set(null);
-    currentProject.set(null);
-    projects.set([]);
-    chatMessages.set([]);
-    mixcoreConnected.set(false);
+    try {
+      await mixcoreService.logout();
+    } catch (error) {
+      console.warn('Logout API call failed:', error);
+    } finally {
+      // Always clear local state regardless of API call success
+      user.set(null);
+      currentProject.set(null);
+      projects.set([]);
+      chatMessages.set([]);
+      mixcoreConnected.set(false);
+      console.log('User logged out and local state cleared');
+    }
   },
 
   async initialize() {
     try {
+      // Check if we have stored user data first
+      const storedUser = get(user);
+      
       const initialized = await mixcoreService.initialize();
       if (initialized) {
         const currentUser = mixcoreService.currentUser;
@@ -110,11 +134,40 @@ export const userActions = {
           } catch (projectError) {
             console.warn('Failed to load projects during initialization:', projectError);
           }
+          return true;
         }
       }
-      return initialized;
+      
+      // If mixcore failed to initialize but we have stored user data and tokens,
+      // we're likely in offline mode - restore the stored user state
+      if (storedUser && mixcoreService.getClient().auth.isAuthenticated) {
+        console.log('Restoring user state from persistent storage (offline mode)');
+        user.set(storedUser);
+        mixcoreConnected.set(false); // We're offline but authenticated
+        return true;
+      }
+      
+      // If we have stored user but no tokens, clear the stale data
+      if (storedUser && !mixcoreService.getClient().auth.isAuthenticated) {
+        console.warn('Found stored user but no valid tokens, clearing stale auth state');
+        user.set(null);
+        mixcoreConnected.set(false);
+      }
+      
+      return false;
     } catch (error) {
       console.error('Initialization error:', error);
+      
+      // If there's an error but we have stored user data and tokens, 
+      // we might still be able to work in offline mode
+      const storedUser = get(user);
+      if (storedUser && mixcoreService.getClient().auth.isAuthenticated) {
+        console.log('Error during initialization but restoring from persistent storage');
+        user.set(storedUser);
+        mixcoreConnected.set(false);
+        return true;
+      }
+      
       // Reset to safe state
       user.set(null);
       mixcoreConnected.set(false);
