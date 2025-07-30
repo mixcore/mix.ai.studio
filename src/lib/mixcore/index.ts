@@ -10,14 +10,18 @@ export type {
   User,
   TokenInfo,
   DatabaseRecord,
-  MixcoreSDKError,
-  AuthenticationError,
-  NetworkError,
-  ValidationError,
   QueryOptions,
   ExportOptions,
   AssociationData,
   FilterAssociationsOptions
+} from './types';
+
+// Error classes export
+export {
+  MixcoreSDKError,
+  AuthenticationError,
+  NetworkError,
+  ValidationError
 } from './types';
 
 // Utility exports
@@ -33,11 +37,3 @@ export {
   validateMinLength,
   validateObject
 } from './helpers';
-
-// Error classes
-export {
-  MixcoreSDKError,
-  AuthenticationError,
-  NetworkError,
-  ValidationError
-} from './types';

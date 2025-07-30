@@ -3,21 +3,31 @@
   import CodeEditor from './CodeEditor.svelte';
   import { writable, derived } from 'svelte/store';
 
-  export let files = [];
+  export let files: Record<string, any> | any[] = [];
 
-  let openFiles = writable([]);
-  let activeFile = writable(null);
+  interface FileItem {
+    name: string;
+    path: string;
+    content?: string;
+  }
+
+  let openFiles = writable<FileItem[]>([]);
+  let activeFile = writable<FileItem | null>(null);
   let searchTerm = writable('');
 
   const filteredFiles = derived(
     [searchTerm, writable(files)],
     ([$searchTerm, $files]) => {
       if (!$searchTerm) return $files;
-      return $files.filter(file => file.path.toLowerCase().includes($searchTerm.toLowerCase()));
+      // Handle both array and object file structures
+      if (Array.isArray($files)) {
+        return $files.filter((file: any) => file.path?.toLowerCase().includes($searchTerm.toLowerCase()));
+      }
+      return $files; // For object-based file structure
     }
   );
 
-  function handleFileSelect(event) {
+  function handleFileSelect(event: CustomEvent) {
     const file = event.detail;
     if (!$openFiles.find(f => f.path === file.path)) {
       openFiles.update(currentFiles => [...currentFiles, file]);
@@ -25,7 +35,7 @@
     activeFile.set(file);
   }
 
-  function handleCloseFile(event) {
+  function handleCloseFile(event: CustomEvent) {
     const fileToClose = event.detail;
     let newActiveFile = null;
 
@@ -47,7 +57,7 @@
     activeFile.set(newActiveFile);
   }
 
-  function handleSelectFile(event) {
+  function handleSelectFile(event: CustomEvent) {
     activeFile.set(event.detail);
   }
 </script>

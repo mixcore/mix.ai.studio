@@ -123,7 +123,7 @@ export class ApiClient {
     } catch (error) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new NetworkError('Request timeout');
       }
       
@@ -132,7 +132,8 @@ export class ApiClient {
       }
       
       // Network or other errors
-      throw new NetworkError(`Network error: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
+      throw new NetworkError(`Network error: ${errorMessage}`);
     }
   }
 

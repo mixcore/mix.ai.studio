@@ -13,7 +13,7 @@
 			id: Date.now().toString(),
 			content: $chatInput,
 			role: 'user' as const,
-			timestamp: new Date()
+			timestamp: new Date().toISOString()
 		};
 
 		chatMessages.update(messages => [...messages, message]);
@@ -26,7 +26,7 @@
 				id: (Date.now() + 1).toString(),
 				content: "I'll help you build that! Let me start by creating the necessary components and structure for your project.",
 				role: 'assistant' as const,
-				timestamp: new Date()
+				timestamp: new Date().toISOString()
 			};
 			chatMessages.update(messages => [...messages, response]);
 			chatLoading.set(false);

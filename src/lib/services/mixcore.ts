@@ -272,6 +272,3 @@ class MixcoreService {
 
 // Create singleton instance
 export const mixcoreService = new MixcoreService();
-
-// Export types for use in components
-export type { Project, ChatMessage, User };

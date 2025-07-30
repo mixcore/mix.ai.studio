@@ -142,13 +142,13 @@ export class AuthModule {
 
   async register(credentials: RegisterCredentials): Promise<User> {
     // Validate input
-    validateRequired(credentials.userName, 'Username');
+    validateRequired(credentials.username, 'Username');
     validateEmail(credentials.email);
     validateMinLength(credentials.password, 6, 'Password');
 
     // Construct payload with correct key casing
     const payload = {
-      userName: credentials.userName,
+      userName: credentials.username,
       email: credentials.email,
       password: credentials.password
     };

@@ -2,8 +2,14 @@
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import loader from '@monaco-editor/loader';
 
-  export let openFiles = [];
-  export let activeFile = null;
+  interface FileItem {
+    name?: string;
+    path: string;
+    content?: string;
+  }
+
+  export let openFiles: FileItem[] = [];
+  export let activeFile: FileItem | null | undefined = null;
 
   const dispatch = createEventDispatcher();
 
@@ -11,11 +17,11 @@
   let editor: any;
   let monaco: any;
 
-  function closeFile(file) {
+  function closeFile(file: FileItem) {
     dispatch('closeFile', file);
   }
 
-  function selectFile(file) {
+  function selectFile(file: FileItem) {
     dispatch('selectFile', file);
   }
 

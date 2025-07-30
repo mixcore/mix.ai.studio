@@ -21,7 +21,7 @@ export class DatabaseModule {
 
     // Check cache first
     const cacheKey = generateCacheKey('getData', databaseName, query?.toQueryParams());
-    const cached = defaultCache.get<T[]>(cacheKey);
+    const cached = defaultCache.get(cacheKey) as T[] | null;
     if (cached) {
       return cached;
     }
@@ -43,7 +43,7 @@ export class DatabaseModule {
     validateRequired(id, 'ID');
 
     const cacheKey = generateCacheKey('getDataById', databaseName, id);
-    const cached = defaultCache.get<T>(cacheKey);
+    const cached = defaultCache.get(cacheKey) as T | null;
     if (cached) {
       return cached;
     }
