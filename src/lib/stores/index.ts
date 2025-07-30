@@ -9,9 +9,7 @@ import { initializeSDK } from '$lib/sdk/client';
 
 // Initialize services
 export const sdkClient = initializeSDK();
-export const llmService = createLLMService({
-  sdkEndpoint: sdkClient.getConfig().endpoint
-});
+export const llmService = createLLMService();
 export const databaseService = createDatabaseService();
 
 export const user = writable<User | null>(null);

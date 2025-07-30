@@ -51,7 +51,6 @@ export interface LLMConfig {
   temperature: number;
   providers: Record<string, LLMProvider>;
   mcpConnections: Record<string, MCPConnection>;
-  sdkEndpoint?: string; // SDK client endpoint for dynamic MCP URL generation
 }
 
 // Default configuration
@@ -90,7 +89,7 @@ const DEFAULT_CONFIG: LLMConfig = {
     mixcore: {
       name: 'Mixcore MCP Server',
       type: 'sse',
-      url: 'https://mixcore.net/mcp/sse', // Default fallback, will be updated dynamically
+      url: 'https://mixcore.net/mcp/sse',
       timeout: 300,
       autoApprove: [],
       disabled: false
@@ -104,51 +103,9 @@ export class LLMService {
 
   constructor(config: Partial<LLMConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
-    // Update MCP connections with dynamic endpoint if provided
-    if (config.sdkEndpoint) {
-      this.updateMCPConnectionsForEndpoint(config.sdkEndpoint);
-    }
-    
     this.initializeMCPConnections();
   }
 
-  // Update MCP connections to use the SDK endpoint
-  private updateMCPConnectionsForEndpoint(sdkEndpoint: string) {
-    try {
-      const url = new URL(sdkEndpoint);
-      
-      // Extract base URL and transform for MCP endpoint
-      let mcpUrl: string;
-      
-      if (url.hostname.includes('mixcore.net')) {
-        // Transform mixcore.net to mixcore.net
-        mcpUrl = `${url.protocol}//mixcore.net/mcp/sse`;
-      } else if (url.hostname.includes('localhost') || url.hostname.includes('127.0.0.1')) {
-        // For local development, assume MCP is on a different port or path
-        mcpUrl = `${url.protocol}//${url.hostname}:${url.port || '3000'}/mcp/sse`;
-      } else {
-        // For other domains, construct MCP URL by replacing subdomain
-        const parts = url.hostname.split('.');
-        if (parts.length >= 2) {
-          parts[0] = 'agent'; // Replace first subdomain with 'agent'
-          mcpUrl = `${url.protocol}//${parts.join('.')}/mcp/sse`;
-        } else {
-          // Fallback: use same domain but different path
-          mcpUrl = `${url.protocol}//${url.hostname}/mcp/sse`;
-        }
-      }
-      
-      // Update the mixcore MCP connection
-      if (this.config.mcpConnections.mixcore) {
-        this.config.mcpConnections.mixcore.url = mcpUrl;
-        console.log('🔗 Updated MCP URL:', mcpUrl);
-      }
-    } catch (error) {
-      console.error('Failed to parse SDK endpoint for MCP URL generation:', error);
-      // Fallback to default if URL parsing fails
-    }
-  }
 
   // Initialize MCP connections
   private async initializeMCPConnections() {
@@ -541,19 +498,6 @@ export class LLMService {
     }
   }
 
-  // Update SDK endpoint and reconnect MCP if needed
-  updateSDKEndpoint(sdkEndpoint: string) {
-    this.updateMCPConnectionsForEndpoint(sdkEndpoint);
-    
-    // Reconnect MCP connections if they were already initialized
-    if (this.mcpClients.size > 0) {
-      console.log('🔄 Updating MCP connections with new SDK endpoint:', sdkEndpoint);
-      // Disconnect existing connections
-      this.destroy();
-      // Reinitialize with new endpoint
-      this.initializeMCPConnections();
-    }
-  }
 
   // Cleanup
   destroy() {
@@ -574,9 +518,6 @@ let llmService: LLMService | null = null;
 export function createLLMService(config?: Partial<LLMConfig>): LLMService {
   if (!llmService) {
     llmService = new LLMService(config);
-  } else if (config?.sdkEndpoint) {
-    // If SDK endpoint is provided after initialization, update it
-    llmService.updateSDKEndpoint(config.sdkEndpoint);
   }
   return llmService;
 }

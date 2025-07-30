@@ -75,8 +75,8 @@ The LLM service (`src/lib/services/llm.ts`) integrates multiple AI providers:
 - **Google Gemini**: Gemini Pro, Gemini Flash models
 - **DeepSeek**: DeepSeek Chat, DeepSeek Coder models
 - **MCP Integration**: Model Context Protocol with dynamic endpoint configuration
-  - Automatically uses SDK client endpoint to generate MCP server URLs
-  - Using `mixcore.net` for MCP connections
+  - Automatically uses same domain as SDK client endpoint for MCP server URLs
+  - Uses same `mixcore.net` domain with `/mcp/sse` path
   - Supports local development and custom domain configurations
 
 #### Database Service
