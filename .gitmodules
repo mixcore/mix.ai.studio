@@ -1,3 +1,4 @@
-[submodule "src/lib/sdk"]
-	path = src/lib/sdk
+[submodule]
+[submodule "src/lib/javascript-sdk"]
+	path = src/lib/javascript-sdk
 	url = https://github.com/mixcore/javascript-sdk.git
