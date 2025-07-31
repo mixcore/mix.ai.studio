@@ -16,17 +16,20 @@
 		success: { user: any };
 	}>();
 	
-	async function handleLogin(event: CustomEvent<{ email: string; password: string }>) {
-		const { email, password } = event.detail;
-		
+	async function handleLogin(event: CustomEvent<{ username: string; password: string }>) {
+		const { username, password } = event.detail;
+
 		try {
 			loading = true;
 			error = '';
-			
-			// Await the login action. If it throws an error, the catch block will handle it.
-			// If it resolves, we know it was successful.
-			await userActions.login(email, password);
-			
+
+			// Await the login action using the SDK-based login flow.
+			const result = await userActions.login(username, password);
+
+			if (!result?.success) {
+				throw new Error(result?.error || 'Login failed. Please try again.');
+			}
+
 			dispatch('success', { user: userActions });
 			dispatch('close');
 		} catch (err: any) {

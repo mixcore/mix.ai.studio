@@ -7,7 +7,7 @@
 	
 	// Import auth persistence test in development
 	if (import.meta.env.DEV) {
-		import('$lib/test-auth-persistence');
+		// import('$lib/test-auth-persistence');
 	}
 
 	let visibilityChangeHandler: () => void;

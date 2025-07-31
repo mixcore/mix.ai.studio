@@ -1,10 +1,7 @@
-import { MixcoreClient } from '$lib/sdk-client/packages/sdk-client/src/client';
-import { MixQuery } from '$lib/sdk-client/packages/sdk-client/src/query';
-import type { IClientConfig, IProfile as MixcoreUser } from '$lib/sdk-client/packages/sdk-client/src/types';
-import type { IDynamicData as DatabaseRecord } from '$lib/sdk-client/packages/sdk-client/src/base';
+// Mixcore service stub - sdk-client logic removed
 
 // Extended project interface for Mixcore
-export interface Project extends DatabaseRecord {
+export interface Project {
   id: string;
   name: string;
   description?: string;
@@ -17,7 +14,7 @@ export interface Project extends DatabaseRecord {
 }
 
 // Chat message interface for Mixcore
-export interface ChatMessage extends DatabaseRecord {
+export interface ChatMessage {
   id: string;
   content: string;
   role: 'user' | 'assistant' | 'system';
@@ -26,277 +23,149 @@ export interface ChatMessage extends DatabaseRecord {
   metadata?: Record<string, any>;
 }
 
-// User interface extending Mixcore user
-export interface User extends MixcoreUser {
+// User interface for Mixcore
+export interface User {
+  id: string;
+  email: string;
   avatar?: string;
   preferences?: Record<string, any>;
 }
 
 class MixcoreService {
-  private client: MixcoreClient | null = null;
-  private config: IClientConfig;
+  // All sdk-client logic removed. Implement your own logic here.
 
-  constructor() {
-    // Default configuration - should be overridden with environment variables
-    this.config = {
-      endpoint: import.meta.env.VITE_MIXCORE_ENDPOINT || 'https://mixcore.net/api/v2',
-      tokenKey: 'mix_access_token',
-      refreshTokenKey: 'mix_refresh_token',
-      tokenType: 'Bearer',
-      events: {
-        onAuthSuccess: () => {
-          console.log('Mixcore authentication successful');
-        },
-        onAuthError: () => {
-          console.log('Mixcore authentication failed');
-        }
-      }
-    };
-  }
-
-  // Initialize the client
   async initialize(): Promise<boolean> {
-    try {
-      if (!this.client) {
-        this.client = new MixcoreClient(this.config);
-      }
-      
-      // Try to restore authentication state from localStorage
-      try {
-        const { SafeLocalStorage } = await import('$lib/sdk-client/packages/sdk-client/src/helpers');
-        const token = SafeLocalStorage.getItemSync(this.config.tokenKey!);
-        const refreshToken = SafeLocalStorage.getItemSync(this.config.refreshTokenKey!);
-        
-        if (token && refreshToken) {
-          // Restore token info
-          this.client.auth.tokenInfo = {
-            accessToken: token,
-            refreshToken: refreshToken,
-            tokenType: 'Bearer'
-          };
-          
-          // Set auth header for API requests
-          const { setAuthToken } = await import('$lib/sdk-client/packages/sdk-client/src/api');
-          setAuthToken(token, 'Bearer');
-          
-          // Try to restore user data
-          await this.client.auth.initUserData();
-          console.log('✅ Authentication state restored from storage');
-        }
-        
-        return true;
-      } catch (error) {
-        // This is expected if user is not logged in or token is expired
-        console.log('No valid authentication found, user needs to login');
-        return true; // Still consider initialization successful
-      }
-    } catch (error) {
-      console.error('Failed to initialize Mixcore service:', error);
-      return false;
-    }
+    // ...stub...
+    return true;
   }
 
-  // Get the client instance
-  getClient(): MixcoreClient {
-    if (!this.client) {
-      this.client = new MixcoreClient(this.config);
-    }
-    return this.client;
+  getClient(): unknown {
+    // ...stub...
+    return null;
   }
 
-  // Authentication methods
   async login(email: string, password: string): Promise<User | null> {
-    try {
-      const client = this.getClient();
-      const tokenInfo = await client.auth.login({ email, password });
-      
-      if (tokenInfo && client.auth.currentUser) {
-        return client.auth.currentUser as User;
+    // Dynamically import AuthService to avoid circular deps
+    const { AuthService } = await import('$lib/javascript-sdk/packages/user/src/auth-services');
+    // Use the same config as in +page.svelte
+    const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
+    const authService = new AuthService({
+      apiBaseUrl,
+      encryptAES: (data: string) => data,
+      updateAuthData: () => {},
+      fillAuthData: async () => ({}),
+      initAllSettings: async () => {},
+      getApiResult: async (req: { url: string, method?: string, data?: any }) => {
+        const url = req.url.startsWith('http') ? req.url : `${apiBaseUrl}${req.url}`;
+        const response = await fetch(url, {
+          method: req.method || 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: req.data ? JSON.stringify(req.data) : undefined
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data };
+      },
+      getRestApiResult: async (req: { url: string, method?: string, data?: any }) => {
+        const url = req.url.startsWith('http') ? req.url : `${apiBaseUrl}${req.url}`;
+        const response = await fetch(url, {
+          method: req.method || 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: req.data && req.method !== 'GET' ? JSON.stringify(req.data) : undefined
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data };
       }
-      
-      return null;
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+    });
+    const result = await authService.loginUnsecure({
+      userName: email,
+      password,
+      rememberMe: true,
+      email: '',
+      phoneNumber: '',
+      returnUrl: ''
+    });
+    if (result.isSucceed && result.data && result.data.user) {
+      return result.data.user;
     }
+    return null;
   }
 
   async logout(): Promise<void> {
-    try {
-      const client = this.getClient();
-      client.auth.logout();
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+    // ...stub...
   }
 
   async getCurrentUser(): Promise<User | null> {
-    try {
-      const client = this.getClient();
-      return await client.auth.initUserData() as User;
-    } catch (error) {
-      console.error('Failed to get current user:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
   get isAuthenticated(): boolean {
-    return !!this.client?.auth.currentUser;
+    // ...stub...
+    return false;
   }
 
   get currentUser(): User | null {
-    return this.client?.auth.currentUser as User || null;
+    // ...stub...
+    return null;
   }
 
-  // Project management
   async getProjects(): Promise<Project[]> {
-    try {
-      const client = this.getClient();
-      const query = new MixQuery()
-        .orderBy('modifiedDate', 'desc');
-      
-      return await client.database.getData<Project>('projects', query);
-    } catch (error) {
-      console.error('Failed to get projects:', error);
-      return [];
-    }
+    // ...stub...
+    return [];
   }
 
   async createProject(projectData: Omit<Project, 'id' | 'createdDate' | 'modifiedDate' | 'ownerId'>): Promise<Project | null> {
-    try {
-      const client = this.getClient();
-      const data = {
-        ...projectData,
-        createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString(),
-        ownerId: client.auth.currentUser?.id || ''
-      };
-      
-      return await client.database.createData<Project>('projects', data);
-    } catch (error) {
-      console.error('Failed to create project:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
   async updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
-    try {
-      const client = this.getClient();
-      const data = {
-        ...updates,
-        modifiedDate: new Date().toISOString()
-      };
-      
-      return await client.database.updateData<Project>('projects', id, data);
-    } catch (error) {
-      console.error('Failed to update project:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
   async deleteProject(id: string): Promise<boolean> {
-    try {
-      const client = this.getClient();
-      return await client.database.deleteData('projects', id);
-    } catch (error) {
-      console.error('Failed to delete project:', error);
-      return false;
-    }
+    // ...stub...
+    return false;
   }
 
   async getProject(id: string): Promise<Project | null> {
-    try {
-      const client = this.getClient();
-      return await client.database.getDataById<Project>('projects', id);
-    } catch (error) {
-      console.error('Failed to get project:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
-  // Chat management
   async getChatMessages(projectId?: string): Promise<ChatMessage[]> {
-    try {
-      const client = this.getClient();
-      let query = new MixQuery()
-        .orderBy('timestamp', 'asc');
-      
-      if (projectId) {
-        query = query.where('projectId', projectId);
-      }
-      
-      return await client.database.getData<ChatMessage>('chat_messages', query);
-    } catch (error) {
-      console.error('Failed to get chat messages:', error);
-      return [];
-    }
+    // ...stub...
+    return [];
   }
 
   async createChatMessage(messageData: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage | null> {
-    try {
-      const client = this.getClient();
-      const data = {
-        ...messageData,
-        timestamp: new Date().toISOString()
-      };
-      
-      return await client.database.createData<ChatMessage>('chat_messages', data);
-    } catch (error) {
-      console.error('Failed to create chat message:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
   async deleteChatMessage(id: string): Promise<boolean> {
-    try {
-      const client = this.getClient();
-      return await client.database.deleteData('chat_messages', id);
-    } catch (error) {
-      console.error('Failed to delete chat message:', error);
-      return false;
-    }
+    // ...stub...
+    return false;
   }
 
-  // File storage
   async uploadFile(file: File): Promise<string | null> {
-    try {
-      const client = this.getClient();
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const result = await client.storage.uploadFile(formData);
-      return result.url;
-    } catch (error) {
-      console.error('Failed to upload file:', error);
-      return null;
-    }
+    // ...stub...
+    return null;
   }
 
   async deleteFile(filePath: string): Promise<boolean> {
-    try {
-      const client = this.getClient();
-      return await client.storage.deleteFile(filePath);
-    } catch (error) {
-      console.error('Failed to delete file:', error);
-      return false;
-    }
+    // ...stub...
+    return false;
   }
 
-  // Utility methods
   async healthCheck(): Promise<boolean> {
-    try {
-      const client = this.getClient();
-      return await client.healthCheck();
-    } catch (error) {
-      console.error('Health check failed:', error);
-      return false;
-    }
+    // ...stub...
+    return false;
   }
 
-  // Clean up resources
   destroy(): void {
-    this.client?.destroy();
-    this.client = null;
+    // ...stub...
   }
 }
 
