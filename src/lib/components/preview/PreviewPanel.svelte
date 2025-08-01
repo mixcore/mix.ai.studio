@@ -3,23 +3,24 @@
 	import { previewUrl, previewLoading, showCodeView, deviceMode } from '$lib/stores';
 	import { cn } from '$lib/utils';
 
-	let iframeContainer: HTMLDivElement;
 
 	$: containerClass = cn(
 		"bg-base-100 border border-base-300 rounded-lg overflow-hidden mx-auto relative",
 		$deviceMode === 'mobile' && "w-[375px] h-[667px] shadow-xl",
 		$deviceMode === 'tablet' && "w-[768px] h-[1024px] shadow-lg", 
-		$deviceMode === 'desktop' && "w-full h-full"
+		$deviceMode === 'desktop' && "w-[1440px] h-[900px] shadow-2xl"
 	);
 
-	// Calculate scale for mobile and tablet to fit better in viewport
+	// Calculate scale for all device modes to fit better in viewport
 	$: scaleTransform = (() => {
 		if ($deviceMode === 'mobile') {
-			return 'scale(0.85)'; // Scale down mobile view for better fit
+			return 'scale(1)'; // Scale down mobile view for better fit
 		} else if ($deviceMode === 'tablet') {
-			return 'scale(0.65)'; // Scale down tablet view for better fit
+			return 'scale(0.85)'; // Scale down tablet view for better fit
+		} else if ($deviceMode === 'desktop') {
+			return 'scale(1)'; // Scale down desktop view for better fit
 		}
-		return 'scale(1)'; // No scaling for desktop
+		return 'scale(1)'; // Fallback
 	})();
 
 	// Add device-specific styling and viewport meta simulation
@@ -28,6 +29,8 @@
 			return 'width: 375px; height: 667px;'; // iPhone dimensions
 		} else if ($deviceMode === 'tablet') {
 			return 'width: 768px; height: 1024px;'; // iPad dimensions
+		} else if ($deviceMode === 'desktop') {
+			return 'width: 1440px; height: 900px;'; // Desktop dimensions
 		}
 		return '';
 	})();
@@ -42,12 +45,12 @@
 				<div class="space-y-2">
 					<div class="text-gray-500">// Generated SvelteKit Application</div>
 					<div>&lt;script lang="ts"&gt;</div>
-					<div class="ml-4">import {{ onMount }} from 'svelte';</div>
+					<div class="ml-4">import &#123; onMount &#125; from 'svelte';</div>
 					<div class="ml-4">let message = 'Hello, World!';</div>
 					<div>&lt;/script&gt;</div>
 					<br>
 					<div>&lt;main&gt;</div>
-					<div class="ml-4">&lt;h1&gt;{{message}}&lt;/h1&gt;</div>
+					<div class="ml-4">&lt;h1&gt;&#123;message&#125;&lt;/h1&gt;</div>
 					<div>&lt;/main&gt;</div>
 					<br>
 					<div>&lt;style&gt;</div>
@@ -58,7 +61,6 @@
 		{:else}
 			<!-- Live Preview -->
 			<div 
-				bind:this={iframeContainer}
 				class="h-full flex items-center justify-center p-4"
 			>
 				<div 
@@ -89,6 +91,22 @@
 							<!-- Side buttons -->
 							<div class="absolute right-0 top-20 w-0.5 h-20 bg-gray-700 rounded-l"></div>
 						</div>
+					{:else if $deviceMode === 'desktop'}
+						<!-- Desktop Monitor Frame -->
+						<div class="absolute -inset-6 bg-gray-900 rounded-t-2xl shadow-2xl">
+							<!-- Monitor bezel -->
+							<div class="absolute inset-0 bg-gradient-to-b from-gray-800 to-gray-900 rounded-t-2xl border-2 border-gray-700"></div>
+							<!-- Screen area -->
+							<div class="absolute inset-3 bg-black rounded-lg shadow-inner"></div>
+							<!-- Monitor stand base -->
+							<div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 w-32 h-2 bg-gray-700 rounded-full"></div>
+							<!-- Monitor stand neck -->
+							<div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-4 h-8 bg-gray-700 rounded-b-lg"></div>
+							<!-- Power LED -->
+							<div class="absolute bottom-2 right-4 w-2 h-2 bg-green-400 rounded-full opacity-80"></div>
+							<!-- Brand logo area -->
+							<div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-gray-600 rounded-full opacity-50"></div>
+						</div>
 					{/if}
 					
 					<div class="relative z-10 w-full h-full rounded-lg overflow-hidden">
@@ -105,7 +123,7 @@
 								class="w-full h-full border-0 rounded-lg"
 								title="App Preview"
 								sandbox="allow-scripts allow-same-origin allow-forms"
-								style={$deviceMode !== 'desktop' ? `${deviceSpecificStyle}` : ''}
+								style={deviceSpecificStyle}
 							></iframe>
 						{/if}
 					</div>
