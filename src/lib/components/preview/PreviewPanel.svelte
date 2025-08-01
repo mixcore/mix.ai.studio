@@ -23,16 +23,66 @@
 		return 'scale(1)'; // Fallback
 	})();
 
-	// Add device-specific styling and viewport meta simulation
-	$: deviceSpecificStyle = (() => {
+	// Device-specific DPI and pixel ratio simulation
+	$: deviceConfig = (() => {
 		if ($deviceMode === 'mobile') {
-			return 'width: 375px; height: 667px;'; // iPhone dimensions
+			return {
+				width: 375,
+				height: 667,
+				pixelRatio: 3, // iPhone 6/7/8 retina display
+				dpi: 326, // iPhone PPI
+				zoom: 1
+			};
 		} else if ($deviceMode === 'tablet') {
-			return 'width: 768px; height: 1024px;'; // iPad dimensions
+			return {
+				width: 768,
+				height: 1024,
+				pixelRatio: 2, // iPad retina display
+				dpi: 264, // iPad PPI
+				zoom: 1
+			};
 		} else if ($deviceMode === 'desktop') {
-			return 'width: 1440px; height: 900px;'; // Desktop dimensions
+			return {
+				width: 1440,
+				height: 900,
+				pixelRatio: 1, // Standard desktop display 
+				dpi: 96, // Standard desktop DPI
+				zoom: 1
+			};
 		}
-		return '';
+		return { width: 0, height: 0, pixelRatio: 1, dpi: 96, zoom: 1 };
+	})();
+
+	// Generate CSS styles with DPI simulation
+	$: deviceSpecificStyle = (() => {
+		const config = deviceConfig;
+		
+		// Calculate effective zoom based on pixel ratio for DPI simulation
+		const dpiZoom = config.pixelRatio > 1 ? 1 / config.pixelRatio : 1;
+		
+		const styles = [
+			`width: ${config.width}px`,
+			`height: ${config.height}px`,
+			`zoom: ${config.zoom}`,
+			`transform-origin: top left`,
+			`image-rendering: ${config.pixelRatio > 1 ? 'crisp-edges' : 'auto'}`,
+			`font-size: ${config.pixelRatio > 1 ? '16px' : '14px'}`, // Simulate higher DPI text
+			`-webkit-font-smoothing: ${config.pixelRatio > 1 ? 'antialiased' : 'auto'}`,
+			`-moz-osx-font-smoothing: ${config.pixelRatio > 1 ? 'grayscale' : 'auto'}`
+		];
+		return styles.join('; ');
+	})();
+
+	// Viewport meta tag simulation for iframe content
+	$: viewportMeta = (() => {
+		const config = deviceConfig;
+		if ($deviceMode === 'mobile') {
+			return `width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover`;
+		} else if ($deviceMode === 'tablet') {
+			return `width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes`;
+		} else {
+			return `width=${config.width}, initial-scale=1.0`;
+		}
 	})();
 </script>
 
@@ -109,6 +159,11 @@
 						</div>
 					{/if}
 					
+					<!-- DPI Info Badge -->
+					<!-- <div class="absolute top-2 right-2 z-20 bg-black/80 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+						{deviceConfig.dpi} DPI • {deviceConfig.pixelRatio}x • {deviceConfig.width}×{deviceConfig.height}
+					</div> -->
+
 					<div class="relative z-10 w-full h-full rounded-lg overflow-hidden">
 						{#if $previewLoading}
 							<div class="w-full h-full flex items-center justify-center bg-muted">
@@ -121,9 +176,10 @@
 							<iframe
 								src={$previewUrl}
 								class="w-full h-full border-0 rounded-lg"
-								title="App Preview"
+								title="App Preview - Viewport: {viewportMeta} | DPI: {deviceConfig.dpi}"
 								sandbox="allow-scripts allow-same-origin allow-forms"
-								style={deviceSpecificStyle}
+								style="{deviceSpecificStyle}; background: white;"
+								loading="lazy"
 							></iframe>
 						{/if}
 					</div>
