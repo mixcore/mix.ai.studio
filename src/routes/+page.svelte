@@ -84,7 +84,7 @@
 		<div class="flex-1 overflow-hidden">
 			<ResizableLayout>
 				<ChatPanel slot="left" />
-				<div slot="right">
+				<div slot="right" class="h-full flex flex-col">
 					{#if $viewMode === 'vscode'}
 						<VscodePanel files={mockFiles} />
 					{:else if $viewMode === 'preview'}

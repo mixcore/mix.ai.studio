@@ -312,29 +312,11 @@
 
 			<button 
 				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'preview'}
-				onclick={() => setViewMode('preview')}
-				title="Preview"
-			>
-				<Monitor class="w-4 h-4" />
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'agent'}
 				onclick={() => setViewMode('agent')}
 				title="Agent Flow"
 			>
 				<GitBranch class="w-4 h-4" />
-			</button>
-
-			<button 
-				class="btn btn-ghost btn-sm"
-				class:btn-active={$viewMode === 'vscode'}
-				onclick={() => setViewMode('vscode')}
-				title="VSCode"
-			>
-				<CodeXml class="w-4 h-4" />
 			</button>
 
 			<button
@@ -345,6 +327,25 @@
 				<Github class="w-4 h-4" />
 				
 			</button>
+			
+			<button 
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'vscode'}
+				onclick={() => setViewMode('vscode')}
+				title="VSCode"
+			>
+				<CodeXml class="w-4 h-4" />
+			</button>
+
+			<button 
+				class="btn btn-ghost btn-sm"
+				class:btn-active={$viewMode === 'preview'}
+				onclick={() => setViewMode('preview')}
+				title="Preview"
+			>
+				<Monitor class="w-4 h-4" />
+			</button>
+
 
 			<!-- Theme Toggle -->
 			<ThemeToggle />
