@@ -231,61 +231,63 @@
 	<!-- Center Section: Preview Controls -->
 	<div class="navbar-center">
 		<div class="flex items-center gap-2">
-			<!-- Device Mode Selector -->
-			<div class="flex items-center bg-base-200 rounded-md p-1">
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'desktop' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					onclick={() => setDeviceMode('desktop')}
-					title="Desktop view"
-				>
-					<Monitor class="w-4 h-4" />
-				</button>
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'tablet' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					onclick={() => setDeviceMode('tablet')}
-					title="Tablet view"
-				>
-					<Tablet class="w-4 h-4" />
-				</button>
-				<button
-					class={cn(
-						"btn btn-sm btn-ghost",
-						$deviceMode === 'mobile' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
-					)}
-					onclick={() => setDeviceMode('mobile')}
-					title="Mobile view"
-				>
-					<Smartphone class="w-4 h-4" />
-				</button>
-			</div>
+			{#if $viewMode === 'preview'}
+				<!-- Device Mode Selector -->
+				<div class="flex items-center bg-base-200 rounded-md p-1">
+					<button
+						class={cn(
+							"btn btn-sm btn-ghost",
+							$deviceMode === 'desktop' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
+						)}
+						onclick={() => setDeviceMode('desktop')}
+						title="Desktop view"
+					>
+						<Monitor class="w-4 h-4" />
+					</button>
+					<button
+						class={cn(
+							"btn btn-sm btn-ghost",
+							$deviceMode === 'tablet' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
+						)}
+						onclick={() => setDeviceMode('tablet')}
+						title="Tablet view"
+					>
+						<Tablet class="w-4 h-4" />
+					</button>
+					<button
+						class={cn(
+							"btn btn-sm btn-ghost",
+							$deviceMode === 'mobile' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
+						)}
+						onclick={() => setDeviceMode('mobile')}
+						title="Mobile view"
+					>
+						<Smartphone class="w-4 h-4" />
+					</button>
+				</div>
 
-			<button 
-				class="btn btn-ghost btn-sm"
-				onclick={refreshPreview}
-				title="Refresh preview"
-			>
-				<RefreshCw class="w-4 h-4" />
-			</button>
-			
-			<button 
-				class="btn btn-ghost btn-sm"
-				onclick={openInNewTab}
-				title="Open in new tab"
-			>
-				<ExternalLink class="w-4 h-4" />
-			</button>
+				<button 
+					class="btn btn-ghost btn-sm"
+					onclick={refreshPreview}
+					title="Refresh preview"
+				>
+					<RefreshCw class="w-4 h-4" />
+				</button>
+				
+				<button 
+					class="btn btn-ghost btn-sm"
+					onclick={openInNewTab}
+					title="Open in new tab"
+				>
+					<ExternalLink class="w-4 h-4" />
+				</button>
 
-			<!-- URL Bar -->
-			<div class="flex items-center gap-1 bg-base-200 rounded-md px-2 py-1 text-xs">
-				<Globe class="w-4 h-4 text-base-content/60" />
-				<span class="text-base-content/70">{$previewUrl}</span>
-			</div>
+				<!-- URL Bar -->
+				<div class="flex items-center gap-1 bg-base-200 rounded-md px-2 py-1 text-xs">
+					<Globe class="w-4 h-4 text-base-content/60" />
+					<span class="text-base-content/70">{$previewUrl}</span>
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -327,7 +329,7 @@
 				<Github class="w-4 h-4" />
 				
 			</button>
-			
+
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'vscode'}
