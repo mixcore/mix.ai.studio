@@ -1,36 +1,39 @@
+
 <script lang="ts">
-	import { 
-		Table, 
-		Database, 
-		Plus, 
-		Search, 
-		Filter,
-		MoreHorizontal,
-		Edit,
-		Trash2,
-		RefreshCw,
-		Eye,
-		ArrowLeft,
-		ChevronRight,
-		Settings,
-		Download,
-		Upload,
-		FileSpreadsheet,
-		FileText,
-		AlertCircle,
-		CheckCircle,
-		Loader,
-		X
-	} from 'lucide-svelte';
-	import { onMount } from 'svelte';
-	import { 
-		databaseService, 
-		databaseTables, 
-		databaseStats, 
-		selectedTable, 
-		databaseLoading 
-	} from '$lib/stores';
-	import type { TableInfo } from '$lib/services/database';
+import { 
+  Table, 
+  Database, 
+  Plus, 
+  Search, 
+  Filter,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Eye,
+  ArrowLeft,
+  ChevronRight,
+  Settings,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  Loader,
+  X
+} from 'lucide-svelte';
+import { onMount } from 'svelte';
+import { 
+  databaseService, 
+  databaseTables, 
+  databaseStats, 
+  selectedTable, 
+  databaseLoading 
+} from '$lib/stores';
+import type { TableInfo } from '$lib/services/database';
+import DatabaseListView from './DatabaseListView.svelte';
+import TablesListView from './TablesListView.svelte';
 
 	let currentView: 'databases' | 'tables' | 'records' = 'databases';
 	let selectedDatabase: TableInfo | null = null;
@@ -302,182 +305,88 @@
 		</div>
 	</div>
 
-	{#if currentView === 'databases'}
-		<!-- Databases View -->
-		<div class="flex-1 flex flex-col">
-			<!-- Search and Actions -->
-			<div class="p-4 border-b border-base-200/40">
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex-1 max-w-md">
-						<div class="join w-full">
-							<input 
-								type="text" 
-								placeholder="Search databases..." 
-								class="input input-bordered join-item flex-1"
-								bind:value={searchQuery}
-								on:input={handleSearch}
-							/>
-							<button class="btn btn-outline join-item">
-								<Search class="w-4 h-4" />
-							</button>
-						</div>
-					</div>
-					
-					<div class="flex items-center gap-2">
-						<button class="btn btn-outline btn-sm">
-							<Filter class="w-4 h-4" />
-							Filter
-						</button>
-						<button class="btn btn-primary btn-sm">
-							<Plus class="w-4 h-4" />
-							New Database
-						</button>
-					</div>
-				</div>
+  {#if currentView === 'databases'}
+	<DatabaseListView
+	  {filteredTables}
+	  loading={$databaseLoading}
+	  {searchQuery}
+	  {formatDate}
+	  {formatNumber}
+	  on:select={(e) => selectDatabaseHandler(e.detail.database)}
+	>
+	  <div slot="actions" class="p-4 border-b border-base-200/40">
+		<div class="flex items-center justify-between gap-4">
+		  <div class="flex-1 max-w-md">
+			<div class="join w-full">
+			  <input 
+				type="text" 
+				placeholder="Search databases..." 
+				class="input input-bordered join-item flex-1"
+				bind:value={searchQuery}
+				on:input={handleSearch}
+			  />
+			  <button class="btn btn-outline join-item">
+				<Search class="w-4 h-4" />
+			  </button>
 			</div>
-
-			<!-- Databases List -->
-			<div class="flex-1 overflow-auto p-4">
-				{#if $databaseLoading}
-					<div class="flex items-center justify-center h-32">
-						<span class="loading loading-spinner loading-lg"></span>
-					</div>
-				{:else}
-					<div class="grid gap-3">
-						{#each filteredTables as database}
-							<div class="card bg-base-50 border border-base-200/60 hover:border-primary/30 transition-colors cursor-pointer">
-								<div class="card-body p-4" on:click={() => selectDatabaseHandler(database)} on:keydown role="button" tabindex="0">
-									<div class="flex items-center justify-between">
-										<div class="flex items-center gap-3">
-											<div class="avatar placeholder">
-												<div class="bg-primary/10 text-primary rounded w-10 h-10">
-													<Database class="w-5 h-5" />
-												</div>
-											</div>
-											<div>
-												<h3 class="font-semibold text-base">{database.displayName}</h3>
-												<p class="text-sm text-base-content/60">
-													{database.description || 'Database'} • Updated {formatDate(database.lastModified)}
-												</p>
-											</div>
-										</div>
-										
-										<div class="flex items-center gap-2">
-											<ChevronRight class="w-4 h-4 text-base-content/40" />
-											<div class="dropdown dropdown-end">
-												<button class="btn btn-ghost btn-sm btn-circle" tabindex="0">
-													<MoreHorizontal class="w-4 h-4" />
-												</button>
-												<ul class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-													<li><button><Eye class="w-4 h-4" /> View Tables</button></li>
-													<li><button><Settings class="w-4 h-4" /> Database Settings</button></li>
-													<li><button><Edit class="w-4 h-4" /> Edit Schema</button></li>
-													<li><hr /></li>
-													<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete Database</button></li>
-												</ul>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
+		  </div>
+		  <div class="flex items-center gap-2">
+			<button class="btn btn-outline btn-sm">
+			  <Filter class="w-4 h-4" />
+			  Filter
+			</button>
+			<button class="btn btn-primary btn-sm">
+			  <Plus class="w-4 h-4" />
+			  New Database
+			</button>
+		  </div>
 		</div>
-	{:else if currentView === 'tables'}
-		<!-- Tables View -->
-		<div class="flex-1 flex flex-col">
-			<!-- Search and Actions -->
-			<div class="p-4 border-b border-base-200/40">
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex-1 max-w-md">
-						<div class="join w-full">
-							<input 
-								type="text" 
-								placeholder="Search tables..." 
-								class="input input-bordered join-item flex-1"
-								bind:value={searchQuery}
-								on:input={handleSearch}
-							/>
-							<button class="btn btn-outline join-item">
-								<Search class="w-4 h-4" />
-							</button>
-						</div>
-					</div>
-					
-					<div class="flex items-center gap-2">
-						<button class="btn btn-outline btn-sm">
-							<Filter class="w-4 h-4" />
-							Filter
-						</button>
-						<button class="btn btn-outline btn-sm" on:click={() => showImportModal = true}>
-							<Upload class="w-4 h-4" />
-							Import
-						</button>
-						<button class="btn btn-primary btn-sm">
-							<Plus class="w-4 h-4" />
-							New Table
-						</button>
-					</div>
-				</div>
+	  </div>
+	</DatabaseListView>
+  {:else if currentView === 'tables'}
+	<TablesListView
+	  {filteredTables}
+	  loading={$databaseLoading}
+	  {searchQuery}
+	  {formatDate}
+	  {formatNumber}
+	  on:select={(e) => selectTableHandler(e.detail.table)}
+	  on:export={(e) => { selectedTable.set(e.detail.table); showExportModal = true; }}
+	  on:import={(e) => { selectedTable.set(e.detail.table); showImportModal = true; }}
+	>
+	  <div slot="actions" class="p-4 border-b border-base-200/40">
+		<div class="flex items-center justify-between gap-4">
+		  <div class="flex-1 max-w-md">
+			<div class="join w-full">
+			  <input 
+				type="text" 
+				placeholder="Search tables..." 
+				class="input input-bordered join-item flex-1"
+				bind:value={searchQuery}
+				on:input={handleSearch}
+			  />
+			  <button class="btn btn-outline join-item">
+				<Search class="w-4 h-4" />
+			  </button>
 			</div>
-
-			<!-- Tables List -->
-			<div class="flex-1 overflow-auto p-4">
-				{#if $databaseLoading}
-					<div class="flex items-center justify-center h-32">
-						<span class="loading loading-spinner loading-lg"></span>
-					</div>
-				{:else}
-					<div class="grid gap-3">
-						{#each filteredTables as table}
-							<div class="card bg-base-50 border border-base-200/60 hover:border-primary/30 transition-colors cursor-pointer">
-								<div class="card-body p-4" on:click={() => selectTableHandler(table)} on:keydown role="button" tabindex="0">
-									<div class="flex items-center justify-between">
-										<div class="flex items-center gap-3">
-											<div class="avatar placeholder">
-												<div class="bg-primary/10 text-primary rounded w-10 h-10">
-													<Table class="w-5 h-5" />
-												</div>
-											</div>
-											<div>
-												<h3 class="font-semibold text-base">{table.displayName}</h3>
-												<p class="text-sm text-base-content/60">
-													{formatNumber(table.recordCount)} records • Updated {formatDate(table.lastModified)}
-												</p>
-												{#if table.description}
-													<p class="text-xs text-base-content/50 mt-1">{table.description}</p>
-												{/if}
-											</div>
-										</div>
-										
-										<div class="flex items-center gap-2">
-											<ChevronRight class="w-4 h-4 text-base-content/40" />
-											<div class="dropdown dropdown-end">
-												<button class="btn btn-ghost btn-sm btn-circle" tabindex="0">
-													<MoreHorizontal class="w-4 h-4" />
-												</button>
-												<ul class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-													<li><button><Eye class="w-4 h-4" /> View Records</button></li>
-													<li><button><Settings class="w-4 h-4" /> Table Settings</button></li>
-													<li><button><Edit class="w-4 h-4" /> Edit Schema</button></li>
-													<li><hr /></li>
-													<li><button on:click={() => { selectedTable.set(table); showExportModal = true; }}><Download class="w-4 h-4" /> Export Data</button></li>
-													<li><button on:click={() => { selectedTable.set(table); showImportModal = true; }}><Upload class="w-4 h-4" /> Import Data</button></li>
-													<li><hr /></li>
-													<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete Table</button></li>
-												</ul>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
+		  </div>
+		  <div class="flex items-center gap-2">
+			<button class="btn btn-outline btn-sm">
+			  <Filter class="w-4 h-4" />
+			  Filter
+			</button>
+			<button class="btn btn-outline btn-sm" on:click={() => showImportModal = true}>
+			  <Upload class="w-4 h-4" />
+			  Import
+			</button>
+			<button class="btn btn-primary btn-sm">
+			  <Plus class="w-4 h-4" />
+			  New Table
+			</button>
+		  </div>
 		</div>
+	  </div>
+	</TablesListView>
 	{:else}
 		<!-- Records View -->
 		<div class="flex-1 flex flex-col">
