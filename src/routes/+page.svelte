@@ -17,9 +17,9 @@
 	let authMode: 'login' | 'register' = 'login';
 	
 	onMount(async () => {
-		// Set preview URL from environment variables first
-		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
-		previewUrl.set(endpoint || 'https://mixcore.net');
+		// Set preview URL to demo page instead of base URL
+		const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'http://localhost:5173';
+		previewUrl.set(`${baseUrl}/demo`);
 
 
 		try {

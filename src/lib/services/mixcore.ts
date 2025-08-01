@@ -1,5 +1,17 @@
 // Mixcore service stub - sdk-client logic removed
 
+// Standardized Error Types
+export class MixcoreError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public statusCode?: number
+  ) {
+    super(message);
+    this.name = 'MixcoreError';
+  }
+}
+
 // Extended project interface for Mixcore
 export interface Project {
   id: string;
@@ -121,44 +133,60 @@ class MixcoreService {
   }
 
   async login(email: string, password: string): Promise<User | null> {
-    const authService = await this.createAuthService();
-    const result = await authService.loginUnsecure({
-      userName: email,
-      password,
-      rememberMe: true,
-      email: '',
-      phoneNumber: '',
-      returnUrl: ''
-    });
-    if (result.isSucceed && result.data) {
-      // The API returns user info in result.data.info, not result.data.user
-      const userInfo = result.data.info;
-      if (userInfo) {
-        const user: User = {
-          id: userInfo.parentId || userInfo.username,
-          email: userInfo.email,
-          username: userInfo.username,
-          avatar: result.data.Avatar,
-          preferences: {}
-        };
-        
-        // Store authentication data
-        this.accessToken = result.data.accessToken;
-        this._currentUser = user;
-        
-        // Persist to localStorage
-        try {
-          localStorage.setItem('mixcore_access_token', result.data.accessToken);
-          localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
-          localStorage.setItem('mixcore_user', JSON.stringify(user));
-        } catch (error) {
-          console.warn('Failed to persist auth state:', error);
+    try {
+      const authService = await this.createAuthService();
+      const result = await authService.loginUnsecure({
+        userName: email,
+        password,
+        rememberMe: true,
+        email: '',
+        phoneNumber: '',
+        returnUrl: ''
+      });
+      
+      if (result.isSucceed && result.data) {
+        // The API returns user info in result.data.info, not result.data.user
+        const userInfo = result.data.info;
+        if (userInfo) {
+          const user: User = {
+            id: userInfo.parentId || userInfo.username,
+            email: userInfo.email,
+            username: userInfo.username,
+            avatar: result.data.Avatar,
+            preferences: {}
+          };
+          
+          // Store authentication data
+          this.accessToken = result.data.accessToken;
+          this._currentUser = user;
+          
+          // Persist to localStorage
+          try {
+            localStorage.setItem('mixcore_access_token', result.data.accessToken);
+            localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
+            localStorage.setItem('mixcore_user', JSON.stringify(user));
+          } catch (error) {
+            console.warn('Failed to persist auth state:', error);
+          }
+          
+          return user;
         }
-        
-        return user;
       }
+      
+      throw new MixcoreError(
+        result.errors?.[0] || 'Login failed',
+        'LOGIN_FAILED',
+        result.status
+      );
+    } catch (error) {
+      if (error instanceof MixcoreError) {
+        throw error;
+      }
+      throw new MixcoreError(
+        error instanceof Error ? error.message : 'Login failed',
+        'LOGIN_ERROR'
+      );
     }
-    return null;
   }
   
   async register(username: string, email: string, password: string): Promise<User | null> {
@@ -201,6 +229,50 @@ class MixcoreService {
 
   get currentUser(): User | null {
     return this._currentUser;
+  }
+
+  private async refreshAuthToken(): Promise<boolean> {
+    const refreshToken = localStorage.getItem('mixcore_refresh_token');
+    if (!refreshToken) return false;
+    
+    try {
+      const authService = await this.createAuthService();
+      const result = await authService.refreshToken(refreshToken, this.accessToken || '');
+      
+      if (result && result.isSucceed && result.data) {
+        // Update stored tokens
+        this.accessToken = result.data.accessToken;
+        localStorage.setItem('mixcore_access_token', result.data.accessToken);
+        if (result.data.refreshToken) {
+          localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
+        }
+        return true;
+      }
+      
+      // If refresh fails, clear auth state
+      await this.logout();
+      return false;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      await this.logout();
+      return false;
+    }
+  }
+
+  // Enhanced method to make authenticated API calls with auto-retry on token expiry
+  private async makeAuthenticatedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
+    try {
+      return await requestFn();
+    } catch (error: any) {
+      // If it's a 401 error, try to refresh the token and retry once
+      if (error.statusCode === 401 || error.code === 'UNAUTHORIZED') {
+        const refreshed = await this.refreshAuthToken();
+        if (refreshed) {
+          return await requestFn();
+        }
+      }
+      throw error;
+    }
   }
 
   async getProjects(): Promise<Project[]> {

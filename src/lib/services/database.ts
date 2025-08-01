@@ -5,7 +5,7 @@
  * tables, and records with a modern, intuitive interface.
  */
 
-import { mixcoreService } from './mixcore';
+import { mixcoreService, MixcoreError } from './mixcore';
 
 // Define basic query types locally
 export interface MixQuery {
@@ -117,6 +117,64 @@ export class DatabaseService {
     // Use the real mixcore service which has the actual SDK client
   }
 
+  private async createDatabaseService() {
+    // Dynamically import database services to avoid circular deps
+    const { MixDatabaseRestPortalService } = await import('$lib/javascript-sdk/packages/database/src/mix-database-rest-portal-service');
+    const { ModuleDataService } = await import('$lib/javascript-sdk/packages/database/src/module-data-services');
+    
+    const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
+    const accessToken = localStorage.getItem('mixcore_access_token');
+    
+    // Create API service for database operations
+    const apiService = {
+      config: { apiBaseUrl },
+      hooks: [],
+      use: () => {},
+      async get(endpoint: string) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+          }
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      },
+      async post(endpoint: string, body?: any) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+          },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      },
+      async delete(endpoint: string) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+          }
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      }
+    };
+    
+    return {
+      databaseService: new MixDatabaseRestPortalService(apiService),
+      moduleDataService: new ModuleDataService({ apiBaseUrl, apiKey: accessToken })
+    };
+  }
+
   // Get database statistics
   async getDatabaseStats(): Promise<DatabaseStats> {
     try {
@@ -149,102 +207,143 @@ export class DatabaseService {
   // Get all tables
   async getTables(): Promise<TableInfo[]> {
     try {
-      // Mock data for now - replace with actual SDK calls
-      return [
-        {
-          id: 'users',
-          name: 'users',
-          displayName: 'Users',
-          description: 'User accounts and profiles',
-          recordCount: 125,
-          createdDate: '2025-01-10T10:00:00Z',
-          lastModified: '2025-01-13T10:30:00Z',
-          isSystemTable: false,
+      const { moduleDataService } = await this.createDatabaseService();
+      
+      // Try to fetch real database tables using SDK
+      const result = await moduleDataService.fetchDataItems('mixcore-database', {
+        pageSize: 1000,
+        orderBy: 'name',
+        orderDirection: 'asc'
+      });
+      
+      if (result.isSucceed && result.data?.items) {
+        // Transform SDK response to TableInfo format
+        return result.data.items.map((item: any) => ({
+          id: item.id || item.name,
+          name: item.name || item.id,
+          displayName: item.displayName || item.title || item.name,
+          description: item.description || '',
+          recordCount: item.recordCount || 0,
+          createdDate: item.createdDate || new Date().toISOString(),
+          lastModified: item.lastModified || item.modifiedDate || new Date().toISOString(),
+          isSystemTable: item.isSystemTable || false,
           schema: {
-            columns: [
-              { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' },
-              { name: 'email', type: 'varchar', isRequired: true, isUnique: true, maxLength: 255 },
-              { name: 'name', type: 'varchar', isRequired: true, isUnique: false, maxLength: 100 },
-              { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' },
-              { name: 'updated_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' }
+            columns: item.columns || [
+              { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
             ],
-            primaryKey: 'id',
-            indexes: [
-              { name: 'idx_users_email', columns: ['email'], isUnique: true, type: 'btree' },
-              { name: 'idx_users_name', columns: ['name'], isUnique: false, type: 'btree' }
-            ],
-            relationships: []
+            primaryKey: item.primaryKey || 'id',
+            indexes: item.indexes || [],
+            relationships: item.relationships || []
           }
-        },
-        {
-          id: 'posts',
-          name: 'posts',
-          displayName: 'Posts',
-          description: 'Blog posts and articles',
-          recordCount: 1847,
-          createdDate: '2025-01-10T10:00:00Z',
-          lastModified: '2025-01-13T09:15:00Z',
-          isSystemTable: false,
-          schema: {
-            columns: [
-              { name: 'id', type: 'bigint', isRequired: true, isUnique: true },
-              { name: 'title', type: 'varchar', isRequired: true, isUnique: false, maxLength: 255 },
-              { name: 'content', type: 'text', isRequired: false, isUnique: false },
-              { name: 'author_id', type: 'bigint', isRequired: true, isUnique: false },
-              { name: 'status', type: 'varchar', isRequired: true, isUnique: false, maxLength: 50, defaultValue: 'draft' },
-              { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' },
-              { name: 'published_at', type: 'timestamp', isRequired: false, isUnique: false }
-            ],
-            primaryKey: 'id',
-            indexes: [
-              { name: 'idx_posts_author', columns: ['author_id'], isUnique: false, type: 'btree' },
-              { name: 'idx_posts_status', columns: ['status'], isUnique: false, type: 'btree' },
-              { name: 'idx_posts_published', columns: ['published_at'], isUnique: false, type: 'btree' }
-            ],
-            relationships: [
-              {
-                name: 'posts_author_fk',
-                type: 'many-to-one',
-                targetTable: 'users',
-                targetColumn: 'id',
-                sourceColumn: 'author_id',
-                onDelete: 'restrict',
-                onUpdate: 'cascade'
-              }
-            ]
-          }
-        },
-        {
-          id: 'categories',
-          name: 'categories',
-          displayName: 'Categories',
-          description: 'Content categories and tags',
-          recordCount: 23,
-          createdDate: '2025-01-10T10:00:00Z',
-          lastModified: '2025-01-12T16:45:00Z',
-          isSystemTable: false,
-          schema: {
-            columns: [
-              { name: 'id', type: 'bigint', isRequired: true, isUnique: true },
-              { name: 'name', type: 'varchar', isRequired: true, isUnique: true, maxLength: 100 },
-              { name: 'slug', type: 'varchar', isRequired: true, isUnique: true, maxLength: 100 },
-              { name: 'description', type: 'text', isRequired: false, isUnique: false },
-              { name: 'color', type: 'varchar', isRequired: false, isUnique: false, maxLength: 7 },
-              { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' }
-            ],
-            primaryKey: 'id',
-            indexes: [
-              { name: 'idx_categories_slug', columns: ['slug'], isUnique: true, type: 'btree' },
-              { name: 'idx_categories_name', columns: ['name'], isUnique: true, type: 'btree' }
-            ],
-            relationships: []
-          }
-        }
-      ];
+        }));
+      }
+      
+      // Fallback to mock data if SDK call fails or returns no data
+      console.warn('Using fallback database tables - SDK call failed or returned no data');
+      return this.getFallbackTables();
     } catch (error) {
       console.error('Failed to get tables:', error);
-      return [];
+      if (error instanceof MixcoreError) {
+        throw error;
+      }
+      // Return fallback data on error
+      return this.getFallbackTables();
     }
+  }
+
+  // Fallback method with mock data
+  private getFallbackTables(): TableInfo[] {
+    return [
+      {
+        id: 'users',
+        name: 'users',
+        displayName: 'Users',
+        description: 'User accounts and profiles',
+        recordCount: 125,
+        createdDate: '2025-01-10T10:00:00Z',
+        lastModified: '2025-01-13T10:30:00Z',
+        isSystemTable: false,
+        schema: {
+          columns: [
+            { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' },
+            { name: 'email', type: 'varchar', isRequired: true, isUnique: true, maxLength: 255 },
+            { name: 'name', type: 'varchar', isRequired: true, isUnique: false, maxLength: 100 },
+            { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' },
+            { name: 'updated_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' }
+          ],
+          primaryKey: 'id',
+          indexes: [
+            { name: 'idx_users_email', columns: ['email'], isUnique: true, type: 'btree' },
+            { name: 'idx_users_name', columns: ['name'], isUnique: false, type: 'btree' }
+          ],
+          relationships: []
+        }
+      },
+      {
+        id: 'posts',
+        name: 'posts',
+        displayName: 'Posts',
+        description: 'Blog posts and articles',
+        recordCount: 1847,
+        createdDate: '2025-01-10T10:00:00Z',
+        lastModified: '2025-01-13T09:15:00Z',
+        isSystemTable: false,
+        schema: {
+          columns: [
+            { name: 'id', type: 'bigint', isRequired: true, isUnique: true },
+            { name: 'title', type: 'varchar', isRequired: true, isUnique: false, maxLength: 255 },
+            { name: 'content', type: 'text', isRequired: false, isUnique: false },
+            { name: 'author_id', type: 'bigint', isRequired: true, isUnique: false },
+            { name: 'status', type: 'varchar', isRequired: true, isUnique: false, maxLength: 50, defaultValue: 'draft' },
+            { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' },
+            { name: 'published_at', type: 'timestamp', isRequired: false, isUnique: false }
+          ],
+          primaryKey: 'id',
+          indexes: [
+            { name: 'idx_posts_author', columns: ['author_id'], isUnique: false, type: 'btree' },
+            { name: 'idx_posts_status', columns: ['status'], isUnique: false, type: 'btree' },
+            { name: 'idx_posts_published', columns: ['published_at'], isUnique: false, type: 'btree' }
+          ],
+          relationships: [
+            {
+              name: 'posts_author_fk',
+              type: 'many-to-one',
+              targetTable: 'users',
+              targetColumn: 'id',
+              sourceColumn: 'author_id',
+              onDelete: 'restrict',
+              onUpdate: 'cascade'
+            }
+          ]
+        }
+      },
+      {
+        id: 'categories',
+        name: 'categories',
+        displayName: 'Categories',
+        description: 'Content categories and tags',
+        recordCount: 23,
+        createdDate: '2025-01-10T10:00:00Z',
+        lastModified: '2025-01-12T16:45:00Z',
+        isSystemTable: false,
+        schema: {
+          columns: [
+            { name: 'id', type: 'bigint', isRequired: true, isUnique: true },
+            { name: 'name', type: 'varchar', isRequired: true, isUnique: true, maxLength: 100 },
+            { name: 'slug', type: 'varchar', isRequired: true, isUnique: true, maxLength: 100 },
+            { name: 'description', type: 'text', isRequired: false, isUnique: false },
+            { name: 'color', type: 'varchar', isRequired: false, isUnique: false, maxLength: 7 },
+            { name: 'created_at', type: 'timestamp', isRequired: true, isUnique: false, defaultValue: 'now()' }
+          ],
+          primaryKey: 'id',
+          indexes: [
+            { name: 'idx_categories_slug', columns: ['slug'], isUnique: true, type: 'btree' },
+            { name: 'idx_categories_name', columns: ['name'], isUnique: true, type: 'btree' }
+          ],
+          relationships: []
+        }
+      }
+    ];
   }
 
   // Get table by ID

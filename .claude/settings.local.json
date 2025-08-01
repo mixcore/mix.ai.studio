@@ -21,7 +21,8 @@
       "Bash(git submodule:*)",
       "Bash(git rm:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo $VITE_MIXCORE_PREVIEW_ENDPOINT)"
     ],
     "deny": []
   }

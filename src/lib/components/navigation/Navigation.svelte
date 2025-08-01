@@ -120,12 +120,8 @@
 		}
 	}
 
-	function toggleViewMode() {
-		viewMode.update(mode => {
-			if (mode === 'preview') return 'database';
-			if (mode === 'database') return 'vscode';
-			return 'preview';
-		});
+	function setViewMode(mode: 'preview' | 'database' | 'agent' | 'vscode') {
+		viewMode.set(mode);
 	}
 </script>
 
@@ -307,8 +303,8 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'database'}
-				on:click={toggleViewMode}
-				title={$viewMode === 'database' ? 'Switch to Preview' : 'Open Mix Database'}
+				on:click={() => setViewMode('database')}
+				title="Mix Database"
 			>
 				<Database class="w-4 h-4" />
 			</button>
@@ -316,8 +312,8 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'preview'}
-				on:click={() => viewMode.set('preview')}
-				title="Switch to Preview"
+				on:click={() => setViewMode('preview')}
+				title="Preview"
 			>
 				<Monitor class="w-4 h-4" />
 			</button>
@@ -325,7 +321,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'agent'}
-				on:click={() => viewMode.set('agent')}
+				on:click={() => setViewMode('agent')}
 				title="Agent Flow"
 			>
 				<GitBranch class="w-4 h-4" />
@@ -334,7 +330,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'vscode'}
-				on:click={() => viewMode.set('vscode')}
+				on:click={() => setViewMode('vscode')}
 				title="VSCode"
 			>
 				<CodeXml class="w-4 h-4" />
