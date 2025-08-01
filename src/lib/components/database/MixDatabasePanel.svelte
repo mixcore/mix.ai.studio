@@ -32,7 +32,8 @@
 	} from '$lib/stores';
 	import type { TableInfo } from '$lib/services/database';
 
-	let currentView: 'tables' | 'records' = 'tables';
+	let currentView: 'databases' | 'tables' | 'records' = 'databases';
+	let selectedDatabase: TableInfo | null = null;
 	let searchQuery = '';
 	let records: any[] = [];
 	let recordsPage = 1;
@@ -54,17 +55,30 @@
 
 	// Load initial data
 	onMount(async () => {
-		await loadTables();
+		await loadDatabases();
 		await loadDatabaseStats();
 	});
 
-	async function loadTables() {
+	async function loadDatabases() {
 		databaseLoading.set(true);
 		try {
-			const tables = await databaseService.getTables();
-			databaseTables.set(tables);
+			const databases = await databaseService.getTables(); // This now returns databases
+			databaseTables.set(databases);
 		} catch (error) {
-			console.error('Failed to load tables:', error);
+			console.error('Failed to load databases:', error);
+		} finally {
+			databaseLoading.set(false);
+		}
+	}
+	
+	async function loadTablesForDatabase(database: TableInfo) {
+		databaseLoading.set(true);
+		try {
+			const tables = await databaseService.getTablesForDatabase(database.id);
+			databaseTables.set(tables);
+			selectedDatabase = database;
+		} catch (error) {
+			console.error('Failed to load tables for database:', error);
 		} finally {
 			databaseLoading.set(false);
 		}
@@ -79,6 +93,11 @@
 		}
 	}
 
+	async function selectDatabaseHandler(database: TableInfo) {
+		currentView = 'tables';
+		await loadTablesForDatabase(database);
+	}
+	
 	async function selectTableHandler(table: TableInfo) {
 		selectedTable.set(table);
 		currentView = 'records';
@@ -106,16 +125,24 @@
 	}
 
 	function goBackToTables() {
-		currentView = 'tables';
-		selectedTable.set(null);
-		records = [];
+		if (currentView === 'records') {
+			currentView = 'tables';
+			selectedTable.set(null);
+			records = [];
+		} else if (currentView === 'tables') {
+			currentView = 'databases';
+			selectedDatabase = null;
+			loadDatabases();
+		}
 	}
 
 	async function handleRefresh() {
-		if (currentView === 'tables') {
-			await loadTables();
+		if (currentView === 'databases') {
+			await loadDatabases();
 			await loadDatabaseStats();
-		} else if ($selectedTable) {
+		} else if (currentView === 'tables' && selectedDatabase) {
+			await loadTablesForDatabase(selectedDatabase);
+		} else if (currentView === 'records' && $selectedTable) {
 			await loadRecords($selectedTable.name);
 		}
 	}
@@ -238,7 +265,7 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between p-4 border-b border-base-200/60">
 		<div class="flex items-center gap-3">
-			{#if currentView === 'records'}
+			{#if currentView === 'tables' || currentView === 'records'}
 				<button class="btn btn-ghost btn-sm btn-circle" on:click={goBackToTables}>
 					<ArrowLeft class="w-4 h-4" />
 				</button>
@@ -246,7 +273,13 @@
 			<div class="flex items-center gap-2">
 				<Database class="w-5 h-5 text-primary" />
 				<h2 class="text-lg font-semibold">
-					{currentView === 'tables' ? 'Mix Database' : $selectedTable?.displayName}
+					{#if currentView === 'databases'}
+						Mix Databases
+					{:else if currentView === 'tables'}
+						{selectedDatabase?.displayName} Tables
+					{:else}
+						{$selectedTable?.displayName}
+					{/if}
 				</h2>
 			</div>
 		</div>
@@ -269,7 +302,90 @@
 		</div>
 	</div>
 
-	{#if currentView === 'tables'}
+	{#if currentView === 'databases'}
+		<!-- Databases View -->
+		<div class="flex-1 flex flex-col">
+			<!-- Search and Actions -->
+			<div class="p-4 border-b border-base-200/40">
+				<div class="flex items-center justify-between gap-4">
+					<div class="flex-1 max-w-md">
+						<div class="join w-full">
+							<input 
+								type="text" 
+								placeholder="Search databases..." 
+								class="input input-bordered join-item flex-1"
+								bind:value={searchQuery}
+								on:input={handleSearch}
+							/>
+							<button class="btn btn-outline join-item">
+								<Search class="w-4 h-4" />
+							</button>
+						</div>
+					</div>
+					
+					<div class="flex items-center gap-2">
+						<button class="btn btn-outline btn-sm">
+							<Filter class="w-4 h-4" />
+							Filter
+						</button>
+						<button class="btn btn-primary btn-sm">
+							<Plus class="w-4 h-4" />
+							New Database
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Databases List -->
+			<div class="flex-1 overflow-auto p-4">
+				{#if $databaseLoading}
+					<div class="flex items-center justify-center h-32">
+						<span class="loading loading-spinner loading-lg"></span>
+					</div>
+				{:else}
+					<div class="grid gap-3">
+						{#each filteredTables as database}
+							<div class="card bg-base-50 border border-base-200/60 hover:border-primary/30 transition-colors cursor-pointer">
+								<div class="card-body p-4" on:click={() => selectDatabaseHandler(database)} on:keydown role="button" tabindex="0">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-3">
+											<div class="avatar placeholder">
+												<div class="bg-primary/10 text-primary rounded w-10 h-10">
+													<Database class="w-5 h-5" />
+												</div>
+											</div>
+											<div>
+												<h3 class="font-semibold text-base">{database.displayName}</h3>
+												<p class="text-sm text-base-content/60">
+													{database.description || 'Database'} • Updated {formatDate(database.lastModified)}
+												</p>
+											</div>
+										</div>
+										
+										<div class="flex items-center gap-2">
+											<ChevronRight class="w-4 h-4 text-base-content/40" />
+											<div class="dropdown dropdown-end">
+												<button class="btn btn-ghost btn-sm btn-circle" tabindex="0">
+													<MoreHorizontal class="w-4 h-4" />
+												</button>
+												<ul class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+													<li><button><Eye class="w-4 h-4" /> View Tables</button></li>
+													<li><button><Settings class="w-4 h-4" /> Database Settings</button></li>
+													<li><button><Edit class="w-4 h-4" /> Edit Schema</button></li>
+													<li><hr /></li>
+													<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete Database</button></li>
+												</ul>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</div>
+	{:else if currentView === 'tables'}
 		<!-- Tables View -->
 		<div class="flex-1 flex flex-col">
 			<!-- Search and Actions -->
