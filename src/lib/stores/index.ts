@@ -76,6 +76,7 @@ export const userActions = {
     try {
       const mixcoreUser = await mixcoreService.login(email, password);
       if (mixcoreUser) {
+        console.log('✅ User logged in:', mixcoreUser);
         user.set(mixcoreUser);
         mixcoreConnected.set(true);
         

@@ -87,7 +87,12 @@ class MixcoreService {
     const { AuthService } = await import('$lib/javascript-sdk/packages/user/src/auth-services');
     
     const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
-    
+    if (!apiBaseUrl) {
+      throw new MixcoreError('API base URL is not configured', 'API_URL_MISSING');
+    }
+    // Helper to get the latest access token from localStorage
+    const getAccessToken = () => localStorage.getItem('mixcore_access_token');
+
     // Create a minimal API service implementation
     const apiService = {
       config: { apiBaseUrl },
@@ -95,18 +100,24 @@ class MixcoreService {
       use: () => {},
       async get(endpoint: string) {
         const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const token = getAccessToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         const response = await fetch(url, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
+          headers
         });
         const data = await response.json();
         return { isSucceed: response.ok, data, status: response.status };
       },
       async post(endpoint: string, body?: any) {
         const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const token = getAccessToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: body ? JSON.stringify(body) : undefined
         });
         const data = await response.json();
@@ -114,9 +125,12 @@ class MixcoreService {
       },
       async delete(endpoint: string) {
         const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const token = getAccessToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         const response = await fetch(url, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' }
+          headers
         });
         const data = await response.json();
         return { isSucceed: response.ok, data, status: response.status };
