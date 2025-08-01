@@ -27,55 +27,101 @@ export interface ChatMessage {
 export interface User {
   id: string;
   email: string;
+  username?: string;
   avatar?: string;
   preferences?: Record<string, any>;
 }
 
 class MixcoreService {
-  // All sdk-client logic removed. Implement your own logic here.
+  private _currentUser: User | null = null;
+  private accessToken: string | null = null;
 
   async initialize(): Promise<boolean> {
-    // ...stub...
-    return true;
+    // Try to restore authentication from localStorage
+    try {
+      const storedToken = localStorage.getItem('mixcore_access_token');
+      const storedUser = localStorage.getItem('mixcore_user');
+      
+      if (storedToken && storedUser) {
+        this.accessToken = storedToken;
+        this._currentUser = JSON.parse(storedUser);
+        return true;
+      }
+    } catch (error) {
+      console.warn('Failed to restore auth state:', error);
+    }
+    return false;
   }
 
-  getClient(): unknown {
-    // ...stub...
-    return null;
+  getClient() {
+    return {
+      auth: {
+        register: this.register.bind(this),
+        resetPassword: async (email: string) => {
+          const authService = await this.createAuthService();
+          const result = await authService.forgotPassword({ email });
+          return result.isSucceed;
+        },
+        isAuthenticated: this.isAuthenticated,
+        initUserData: async () => {
+          // Stub implementation
+        }
+      }
+    };
   }
 
-  async login(email: string, password: string): Promise<User | null> {
+  private async createAuthService() {
     // Dynamically import AuthService to avoid circular deps
     const { AuthService } = await import('$lib/javascript-sdk/packages/user/src/auth-services');
-    // Use the same config as in +page.svelte
+    
     const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
-    const authService = new AuthService({
-      apiBaseUrl,
+    
+    // Create a minimal API service implementation
+    const apiService = {
+      config: { apiBaseUrl },
+      hooks: [],
+      use: () => {},
+      async get(endpoint: string) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      },
+      async post(endpoint: string, body?: any) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      },
+      async delete(endpoint: string) {
+        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        return { isSucceed: response.ok, data, status: response.status };
+      }
+    };
+    
+    return new AuthService({
+      apiService,
       encryptAES: (data: string) => data,
       updateAuthData: () => {},
       fillAuthData: async () => ({}),
-      initAllSettings: async () => {},
-      getApiResult: async (req: { url: string, method?: string, data?: any }) => {
-        const url = req.url.startsWith('http') ? req.url : `${apiBaseUrl}${req.url}`;
-        const response = await fetch(url, {
-          method: req.method || 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: req.data ? JSON.stringify(req.data) : undefined
-        });
-        const data = await response.json();
-        return { isSucceed: response.ok, data };
-      },
-      getRestApiResult: async (req: { url: string, method?: string, data?: any }) => {
-        const url = req.url.startsWith('http') ? req.url : `${apiBaseUrl}${req.url}`;
-        const response = await fetch(url, {
-          method: req.method || 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          body: req.data && req.method !== 'GET' ? JSON.stringify(req.data) : undefined
-        });
-        const data = await response.json();
-        return { isSucceed: response.ok, data };
-      }
+      initAllSettings: async () => {}
     });
+  }
+
+  async login(email: string, password: string): Promise<User | null> {
+    const authService = await this.createAuthService();
     const result = await authService.loginUnsecure({
       userName: email,
       password,
@@ -84,14 +130,64 @@ class MixcoreService {
       phoneNumber: '',
       returnUrl: ''
     });
-    if (result.isSucceed && result.data && result.data.user) {
-      return result.data.user;
+    if (result.isSucceed && result.data) {
+      // The API returns user info in result.data.info, not result.data.user
+      const userInfo = result.data.info;
+      if (userInfo) {
+        const user: User = {
+          id: userInfo.parentId || userInfo.username,
+          email: userInfo.email,
+          username: userInfo.username,
+          avatar: result.data.Avatar,
+          preferences: {}
+        };
+        
+        // Store authentication data
+        this.accessToken = result.data.accessToken;
+        this._currentUser = user;
+        
+        // Persist to localStorage
+        try {
+          localStorage.setItem('mixcore_access_token', result.data.accessToken);
+          localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
+          localStorage.setItem('mixcore_user', JSON.stringify(user));
+        } catch (error) {
+          console.warn('Failed to persist auth state:', error);
+        }
+        
+        return user;
+      }
+    }
+    return null;
+  }
+  
+  async register(username: string, email: string, password: string): Promise<User | null> {
+    const authService = await this.createAuthService();
+    const result = await authService.saveRegistration({
+      username,
+      email,
+      password,
+      confirmPassword: password
+    });
+    if (result.isSucceed && result.data) {
+      return result.data;
     }
     return null;
   }
 
   async logout(): Promise<void> {
-    // ...stub...
+    // Clear auth state
+    this.accessToken = null;
+    this._currentUser = null;
+    
+    // Clear localStorage
+    try {
+      localStorage.removeItem('mixcore_access_token');
+      localStorage.removeItem('mixcore_refresh_token');
+      localStorage.removeItem('mixcore_user');
+    } catch (error) {
+      console.warn('Failed to clear auth state:', error);
+    }
   }
 
   async getCurrentUser(): Promise<User | null> {
@@ -100,13 +196,11 @@ class MixcoreService {
   }
 
   get isAuthenticated(): boolean {
-    // ...stub...
-    return false;
+    return !!(this.accessToken && this._currentUser);
   }
 
   get currentUser(): User | null {
-    // ...stub...
-    return null;
+    return this._currentUser;
   }
 
   async getProjects(): Promise<Project[]> {

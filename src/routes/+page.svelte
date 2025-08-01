@@ -12,62 +12,15 @@
 	import WelcomeScreen from '$lib/components/welcome/WelcomeScreen.svelte';
 	import AuthModal from '$lib/components/auth/AuthModal.svelte';
 	import { files as mockFiles } from '$lib/vsc-mock/files';
-	import { AuthService } from '$lib/javascript-sdk/packages/user/src/auth-services';
-	
 	let showWelcome = true;
 	let showAuthModal = false;
 	let authMode: 'login' | 'register' = 'login';
-	let authService: AuthService;
 	
 	onMount(async () => {
 		// Set preview URL from environment variables first
 		const endpoint = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT;
 		previewUrl.set(endpoint || 'https://mixcore.net');
 
-		authService = new AuthService({
-			apiBaseUrl: import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net',
-			encryptAES: (data: string) => data,
-			updateAuthData: (data: any) => {
-				user.set(data?.user || null);
-				mixcoreConnected.set(!!data);
-			},
-			fillAuthData: async () => ({}),
-			initAllSettings: async () => {},
-			getApiResult: async (req: { url: string, method?: string, data?: any }) => {
-				const url = req.url.startsWith('http')
-					? req.url
-					: `${import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net'}${req.url}`;
-				const response = await fetch(url, {
-					method: req.method || 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: req.data ? JSON.stringify(req.data) : undefined
-				});
-				const data = await response.json();
-				return {
-					isSucceed: response.ok,
-					data
-				};
-			},
-			getRestApiResult: async (req: { url: string, method?: string, data?: any }) => {
-				const url = req.url.startsWith('http')
-					? req.url
-					: `${import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net'}${req.url}`;
-				const response = await fetch(url, {
-					method: req.method || 'GET',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: req.data && req.method !== 'GET' ? JSON.stringify(req.data) : undefined
-				});
-				const data = await response.json();
-				return {
-					isSucceed: response.ok,
-					data
-				};
-			}
-		});
 
 		try {
 			const initialized = await userActions.initialize();
@@ -109,30 +62,8 @@
 	function handleAuthSuccess() {
 		// The modal now closes itself on success.
 		// This function can be used for other post-login actions, like showing a toast.
+		showAuthModal = false;
 		showWelcome = false;
-	}
-	
-	async function handleLogin(event: CustomEvent<{username: string, password: string}>) {
-		try {
-			const { username, password } = event.detail;
-			const result = await authService.loginUnsecure({
-				userName: username,
-				password,
-				rememberMe: true,
-				email: '',
-				phoneNumber: '',
-				returnUrl: ''
-			});
-
-			if (!result.isSucceed) {
-				throw new Error(result.data?.message || 'Login failed');
-			}
-
-			return { success: true };
-		} catch (error) {
-			console.error('Login failed:', error);
-			return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
-		}
 	}
 
 </script>
@@ -176,6 +107,5 @@
 	mode={authMode}
 	on:close={closeAuthModal}
 	on:success={handleAuthSuccess}
-	on:login={handleLogin}
 />
 <FloatingChatToggle />
