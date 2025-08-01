@@ -37,17 +37,17 @@ export const databaseLoading = writable(false);
 
 // New type for LLM Model (legacy compatibility)
 export type LLMModel = {
-	id: string;
-	name: string;
-	provider: 'OpenAI' | 'Anthropic' | 'Google' | 'Groq' | 'DeepSeek' | 'Mistral';
+  id: string;
+  name: string;
+  provider: 'OpenAI' | 'Anthropic' | 'Google' | 'Groq' | 'DeepSeek' | 'Mistral';
 };
 
 // List of available models (legacy compatibility)
 export const availableModels: LLMModel[] = [
-	{ id: 'gpt-4o', name: 'ChatGPT 4o', provider: 'OpenAI' },
-	{ id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },
-	{ id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
-	{ id: 'llama3-8b', name: 'LLaMA3 8B', provider: 'Groq' }
+  { id: 'gpt-4o', name: 'ChatGPT 4o', provider: 'OpenAI' },
+  { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },
+  { id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
+  { id: 'llama3-8b', name: 'LLaMA3 8B', provider: 'Groq' }
 ];
 export const selectedModel = writable<LLMModel>(availableModels[0]);
 
@@ -60,7 +60,7 @@ export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
 export const showPublishModal = writable(false);
 export const showChatPanel = writable(true);
-export const deviceMode = writable<'desktop' | 'tablet' | 'mobile'>('desktop');
+export const deviceMode = writable<'desktop' | 'tablet' | 'mobile' | 'responsive'>('desktop');
 
 // Mixcore integration stores
 export const mixcoreConnected = writable(false);

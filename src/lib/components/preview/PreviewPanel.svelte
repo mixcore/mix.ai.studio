@@ -8,19 +8,22 @@
 		"bg-base-100 border border-base-300 rounded-lg overflow-hidden mx-auto relative",
 		$deviceMode === 'mobile' && "w-[375px] h-[667px] shadow-xl",
 		$deviceMode === 'tablet' && "w-[768px] h-[1024px] shadow-lg", 
-		$deviceMode === 'desktop' && "w-[1440px] h-[900px] shadow-2xl"
+		$deviceMode === 'desktop' && "w-[1440px] h-[900px] shadow-2xl",
+		$deviceMode === 'responsive' && "w-full h-full min-h-[400px] min-w-[320px]"
 	);
 
 	// Calculate scale for all device modes to fit better in viewport
 	$: scaleTransform = (() => {
 		if ($deviceMode === 'mobile') {
-			return 'scale(1)'; // Scale down mobile view for better fit
+			return 'scale(1)';
 		} else if ($deviceMode === 'tablet') {
-			return 'scale(0.85)'; // Scale down tablet view for better fit
+			return 'scale(0.85)';
 		} else if ($deviceMode === 'desktop') {
-			return 'scale(1)'; // Scale down desktop view for better fit
+			return 'scale(1)';
+		} else if ($deviceMode === 'responsive') {
+			return 'scale(1)';
 		}
-		return 'scale(1)'; // Fallback
+		return 'scale(1)';
 	})();
 
 	// Device-specific DPI and pixel ratio simulation
@@ -29,24 +32,33 @@
 			return {
 				width: 375,
 				height: 667,
-				pixelRatio: 3, // iPhone 6/7/8 retina display
-				dpi: 326, // iPhone PPI
+				pixelRatio: 3,
+				dpi: 326,
 				zoom: 1
 			};
 		} else if ($deviceMode === 'tablet') {
 			return {
 				width: 768,
 				height: 1024,
-				pixelRatio: 2, // iPad retina display
-				dpi: 264, // iPad PPI
+				pixelRatio: 2,
+				dpi: 264,
 				zoom: 1
 			};
 		} else if ($deviceMode === 'desktop') {
 			return {
 				width: 1440,
 				height: 900,
-				pixelRatio: 1, // Standard desktop display 
-				dpi: 96, // Standard desktop DPI
+				pixelRatio: 1,
+				dpi: 96,
+				zoom: 1
+			};
+		} else if ($deviceMode === 'responsive') {
+			// Use 100% for responsive mode
+			return {
+				width: '100%',
+				height: '100%',
+				pixelRatio: window.devicePixelRatio || 1,
+				dpi: 96,
 				zoom: 1
 			};
 		}
@@ -56,17 +68,30 @@
 	// Generate CSS styles with DPI simulation
 	$: deviceSpecificStyle = (() => {
 		const config = deviceConfig;
-		
-		// Calculate effective zoom based on pixel ratio for DPI simulation
+		// Responsive mode: let iframe fill container
+		if ($deviceMode === 'responsive') {
+			return [
+				`width: 100%`,
+				`height: 100%`,
+				`min-width: 320px`,
+				`min-height: 400px`,
+				`zoom: 1`,
+				`transform-origin: top left`,
+				`image-rendering: auto`,
+				`font-size: 16px`,
+				`-webkit-font-smoothing: auto`,
+				`-moz-osx-font-smoothing: auto`
+			].join('; ');
+		}
+		// Other device modes
 		const dpiZoom = config.pixelRatio > 1 ? 1 / config.pixelRatio : 1;
-		
 		const styles = [
 			`width: ${config.width}px`,
 			`height: ${config.height}px`,
 			`zoom: ${config.zoom}`,
 			`transform-origin: top left`,
 			`image-rendering: ${config.pixelRatio > 1 ? 'crisp-edges' : 'auto'}`,
-			`font-size: ${config.pixelRatio > 1 ? '16px' : '14px'}`, // Simulate higher DPI text
+			`font-size: ${config.pixelRatio > 1 ? '16px' : '14px'}`,
 			`-webkit-font-smoothing: ${config.pixelRatio > 1 ? 'antialiased' : 'auto'}`,
 			`-moz-osx-font-smoothing: ${config.pixelRatio > 1 ? 'grayscale' : 'auto'}`
 		];
@@ -80,6 +105,8 @@
 			return `width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover`;
 		} else if ($deviceMode === 'tablet') {
 			return `width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes`;
+		} else if ($deviceMode === 'responsive') {
+			return `width=device-width, initial-scale=1.0`;
 		} else {
 			return `width=${config.width}, initial-scale=1.0`;
 		}

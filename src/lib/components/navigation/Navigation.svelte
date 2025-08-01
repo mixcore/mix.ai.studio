@@ -18,7 +18,8 @@
 		MessageSquare,
 		BrainCircuit,
 		GitBranch,
-		CodeXml
+		CodeXml,
+		Fullscreen
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import {
@@ -58,9 +59,9 @@
 	}
 
 
-	function setDeviceMode(mode: 'desktop' | 'tablet' | 'mobile') {
-		deviceMode.set(mode);
-	}
+function setDeviceMode(mode: 'desktop' | 'tablet' | 'mobile' | 'responsive') {
+	deviceMode.set(mode);
+}
 
 	function setChatMode(mode: 'default' | 'chat-only' | 'agent') {
 		chatMode.set(mode);
@@ -263,6 +264,16 @@
 						title="Mobile view"
 					>
 						<Smartphone class="w-4 h-4" />
+					</button>
+					<button
+						class={cn(
+							"btn btn-sm btn-ghost",
+							$deviceMode === 'responsive' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
+						)}
+						onclick={() => setDeviceMode('responsive')}
+						title="Responsive view"
+					>
+						<Fullscreen class="w-4 h-4 opacity-70" />
 					</button>
 				</div>
 
