@@ -12,7 +12,15 @@
 		Eye,
 		ArrowLeft,
 		ChevronRight,
-		Settings
+		Settings,
+		Download,
+		Upload,
+		FileSpreadsheet,
+		FileText,
+		AlertCircle,
+		CheckCircle,
+		Loader,
+		X
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { 
@@ -30,6 +38,19 @@
 	let recordsPage = 1;
 	let recordsPageSize = 25;
 	let recordsTotal = 0;
+	
+	// Import/Export state
+	let showImportModal = false;
+	let showExportModal = false;
+	let importFile: File | null = null;
+	let exportFormat: 'csv' | 'json' | 'xlsx' = 'csv';
+	let importProgress = 0;
+	let exportProgress = 0;
+	let operationMessage = '';
+	let operationError = '';
+	
+	// File input reference
+	let fileInput: HTMLInputElement;
 
 	// Load initial data
 	onMount(async () => {
@@ -119,6 +140,98 @@
 	function formatNumber(num: number): string {
 		return new Intl.NumberFormat().format(num);
 	}
+	
+	// Import/Export functions
+	async function handleExport(tableId: string, format: 'csv' | 'json' | 'xlsx' = 'csv') {
+		try {
+			exportProgress = 0;
+			operationError = '';
+			operationMessage = `Exporting ${tableId} as ${format.toUpperCase()}...`;
+			
+			const blob = await databaseService.exportTable(tableId, format);
+			exportProgress = 100;
+			
+			// Download the file
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${tableId}.${format}`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			
+			operationMessage = `Successfully exported ${tableId}`;
+			setTimeout(() => {
+				showExportModal = false;
+				operationMessage = '';
+				exportProgress = 0;
+			}, 2000);
+		} catch (error) {
+			console.error('Export failed:', error);
+			operationError = error instanceof Error ? error.message : 'Export failed';
+			exportProgress = 0;
+		}
+	}
+	
+	async function handleImport(tableId: string, file: File) {
+		if (!file || !tableId) return;
+		
+		try {
+			importProgress = 0;
+			operationError = '';
+			operationMessage = `Importing data to ${tableId}...`;
+			
+			const importedCount = await databaseService.importTable(tableId, file);
+			importProgress = 100;
+			
+			operationMessage = `Successfully imported ${importedCount} records to ${tableId}`;
+			
+			// Refresh the records if we're currently viewing this table
+			if ($selectedTable?.id === tableId) {
+				await loadRecords(tableId);
+			}
+			
+			setTimeout(() => {
+				showImportModal = false;
+				operationMessage = '';
+				importProgress = 0;
+				importFile = null;
+			}, 2000);
+		} catch (error) {
+			console.error('Import failed:', error);
+			operationError = error instanceof Error ? error.message : 'Import failed';
+			importProgress = 0;
+		}
+	}
+	
+	function selectFile() {
+		fileInput?.click();
+	}
+	
+	function handleFileSelect(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (file) {
+			importFile = file;
+		}
+	}
+	
+	function resetImportModal() {
+		showImportModal = false;
+		importFile = null;
+		operationMessage = '';
+		operationError = '';
+		importProgress = 0;
+	}
+	
+	function resetExportModal() {
+		showExportModal = false;
+		exportFormat = 'csv';
+		operationMessage = '';
+		operationError = '';
+		exportProgress = 0;
+	}
 </script>
 
 <div class="h-full flex flex-col bg-base-100">
@@ -182,6 +295,10 @@
 							<Filter class="w-4 h-4" />
 							Filter
 						</button>
+						<button class="btn btn-outline btn-sm" on:click={() => showImportModal = true}>
+							<Upload class="w-4 h-4" />
+							Import
+						</button>
 						<button class="btn btn-primary btn-sm">
 							<Plus class="w-4 h-4" />
 							New Table
@@ -230,6 +347,9 @@
 													<li><button><Settings class="w-4 h-4" /> Table Settings</button></li>
 													<li><button><Edit class="w-4 h-4" /> Edit Schema</button></li>
 													<li><hr /></li>
+													<li><button on:click={() => { selectedTable.set(table); showExportModal = true; }}><Download class="w-4 h-4" /> Export Data</button></li>
+													<li><button on:click={() => { selectedTable.set(table); showImportModal = true; }}><Upload class="w-4 h-4" /> Import Data</button></li>
+													<li><hr /></li>
 													<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete Table</button></li>
 												</ul>
 											</div>
@@ -267,6 +387,14 @@
 						<button class="btn btn-outline btn-sm">
 							<Filter class="w-4 h-4" />
 							Filter
+						</button>
+						<button class="btn btn-outline btn-sm" on:click={() => showExportModal = true}>
+							<Download class="w-4 h-4" />
+							Export
+						</button>
+						<button class="btn btn-outline btn-sm" on:click={() => showImportModal = true}>
+							<Upload class="w-4 h-4" />
+							Import
 						</button>
 						<button class="btn btn-primary btn-sm">
 							<Plus class="w-4 h-4" />
@@ -364,3 +492,177 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Import Modal -->
+{#if showImportModal}
+	<div class="modal modal-open">
+		<div class="modal-box">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="font-bold text-lg flex items-center gap-2">
+					<Upload class="w-5 h-5" />
+					Import Data
+				</h3>
+				<button class="btn btn-ghost btn-sm btn-circle" on:click={resetImportModal}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			{#if $selectedTable}
+				<div class="mb-4">
+					<div class="alert alert-info">
+						<AlertCircle class="w-4 h-4" />
+						<span>Importing data to table: <strong>{$selectedTable.displayName}</strong></span>
+					</div>
+				</div>
+			{/if}
+
+			<!-- File Selection -->
+			<div class="form-control mb-4">
+				<label class="label">
+					<span class="label-text">Select file to import</span>
+				</label>
+				<div class="flex gap-2">
+					<input 
+						type="file" 
+						accept=".csv,.json"
+						class="hidden"
+						bind:this={fileInput}
+						on:change={handleFileSelect}
+					/>
+					<button class="btn btn-outline flex-1" on:click={selectFile}>
+						{importFile ? importFile.name : 'Choose file...'}
+					</button>
+				</div>
+				<div class="label">
+					<span class="label-text-alt">Supported formats: CSV, JSON</span>
+				</div>
+			</div>
+
+			<!-- Progress -->
+			{#if importProgress > 0}
+				<div class="mb-4">
+					<div class="flex items-center gap-2 mb-2">
+						<Loader class="w-4 h-4 animate-spin" />
+						<span class="text-sm">{operationMessage}</span>
+					</div>
+					<progress class="progress progress-primary w-full" value={importProgress} max="100"></progress>
+				</div>
+			{/if}
+
+			<!-- Success/Error Messages -->
+			{#if operationMessage && importProgress === 100}
+				<div class="alert alert-success mb-4">
+					<CheckCircle class="w-4 h-4" />
+					<span>{operationMessage}</span>
+				</div>
+			{/if}
+
+			{#if operationError}
+				<div class="alert alert-error mb-4">
+					<AlertCircle class="w-4 h-4" />
+					<span>{operationError}</span>
+				</div>
+			{/if}
+
+			<!-- Actions -->
+			<div class="modal-action">
+				<button class="btn" on:click={resetImportModal}>Cancel</button>
+				<button 
+					class="btn btn-primary" 
+					disabled={!importFile || !$selectedTable || importProgress > 0}
+					on:click={() => $selectedTable && importFile && handleImport($selectedTable.id, importFile)}
+				>
+					{importProgress > 0 ? 'Importing...' : 'Import'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Export Modal -->
+{#if showExportModal}
+	<div class="modal modal-open">
+		<div class="modal-box">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="font-bold text-lg flex items-center gap-2">
+					<Download class="w-5 h-5" />
+					Export Data
+				</h3>
+				<button class="btn btn-ghost btn-sm btn-circle" on:click={resetExportModal}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			{#if $selectedTable}
+				<div class="mb-4">
+					<div class="alert alert-info">
+						<AlertCircle class="w-4 h-4" />
+						<span>Exporting data from table: <strong>{$selectedTable.displayName}</strong></span>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Format Selection -->
+			<div class="form-control mb-4">
+				<label class="label">
+					<span class="label-text">Export format</span>
+				</label>
+				<div class="flex gap-2">
+					<label class="label cursor-pointer flex items-center gap-2 flex-1">
+						<input type="radio" name="exportFormat" class="radio radio-primary" bind:group={exportFormat} value="csv" />
+						<FileSpreadsheet class="w-4 h-4" />
+						<span>CSV</span>
+					</label>
+					<label class="label cursor-pointer flex items-center gap-2 flex-1">
+						<input type="radio" name="exportFormat" class="radio radio-primary" bind:group={exportFormat} value="json" />
+						<FileText class="w-4 h-4" />
+						<span>JSON</span>
+					</label>
+					<label class="label cursor-pointer flex items-center gap-2 flex-1">
+						<input type="radio" name="exportFormat" class="radio radio-primary" bind:group={exportFormat} value="xlsx" />
+						<FileSpreadsheet class="w-4 h-4" />
+						<span>XLSX</span>
+					</label>
+				</div>
+			</div>
+
+			<!-- Progress -->
+			{#if exportProgress > 0}
+				<div class="mb-4">
+					<div class="flex items-center gap-2 mb-2">
+						<Loader class="w-4 h-4 animate-spin" />
+						<span class="text-sm">{operationMessage}</span>
+					</div>
+					<progress class="progress progress-primary w-full" value={exportProgress} max="100"></progress>
+				</div>
+			{/if}
+
+			<!-- Success/Error Messages -->
+			{#if operationMessage && exportProgress === 100}
+				<div class="alert alert-success mb-4">
+					<CheckCircle class="w-4 h-4" />
+					<span>{operationMessage}</span>
+				</div>
+			{/if}
+
+			{#if operationError}
+				<div class="alert alert-error mb-4">
+					<AlertCircle class="w-4 h-4" />
+					<span>{operationError}</span>
+				</div>
+			{/if}
+
+			<!-- Actions -->
+			<div class="modal-action">
+				<button class="btn" on:click={resetExportModal}>Cancel</button>
+				<button 
+					class="btn btn-primary" 
+					disabled={!$selectedTable || exportProgress > 0}
+					on:click={() => $selectedTable && handleExport($selectedTable.id, exportFormat)}
+				>
+					{exportProgress > 0 ? 'Exporting...' : 'Export'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

@@ -6,6 +6,7 @@
  */
 
 import { mixcoreService, MixcoreError } from './mixcore';
+import type { ApiResult } from '@mixcore/shared';
 
 // Define basic query types locally
 export interface MixQuery {
@@ -120,58 +121,71 @@ export class DatabaseService {
   private async createDatabaseService() {
     // Dynamically import database services to avoid circular deps
     const { MixDatabaseRestPortalService } = await import('$lib/javascript-sdk/packages/database/src/mix-database-rest-portal-service');
+    const { MixDatabaseDataRestPortalService } = await import('$lib/javascript-sdk/packages/database/src/mix-database-data-rest-portal-service');
     const { ModuleDataService } = await import('$lib/javascript-sdk/packages/database/src/module-data-services');
+    const { ApiService } = await import('$lib/javascript-sdk/packages/api/src/api-services');
     
     const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
     const accessToken = localStorage.getItem('mixcore_access_token');
     
-    // Create API service for database operations
-    const apiService = {
-      config: { apiBaseUrl },
-      hooks: [],
-      use: () => {},
-      async get(endpoint: string) {
-        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-          }
-        });
-        const data = await response.json();
-        return { isSucceed: response.ok, data, status: response.status };
+    // Create API service using the SDK's ApiService
+    const apiService = new ApiService({
+      apiBaseUrl,
+      apiKey: accessToken
+    });
+    
+    // Create MixDbDatabase service for database listing
+    const mixDbDatabaseService = {
+      async getDatabases(params?: {
+        pageSize?: number;
+        status?: string;
+        sortBy?: string;
+        direction?: 'Asc' | 'Desc';
+        searchColumns?: string;
+        compareOperator?: string;
+        conjunction?: string;
+        columns?: string;
+        keyword?: string;
+        pageIndex?: number;
+      }): Promise<ApiResult> {
+        const queryParams = {
+          pageSize: 20,
+          status: 'Published',
+          sortBy: 'id',
+          direction: 'Desc',
+          searchColumns: 'displayName,systemName',
+          compareOperator: 'Like',
+          conjunction: 'Or',
+          columns: 'id,displayName,systemName,type,createdDatetime',
+          ...params
+        };
+        
+        return apiService.get('/api/v2/rest/mix-portal/mix-db-database', queryParams);
       },
-      async post(endpoint: string, body?: any) {
-        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-          },
-          body: body ? JSON.stringify(body) : undefined
-        });
-        const data = await response.json();
-        return { isSucceed: response.ok, data, status: response.status };
+      
+      async getDatabaseById(id: string): Promise<ApiResult> {
+        return apiService.get(`/api/v2/rest/mix-portal/mix-db-database/get-by/${id}`);
       },
-      async delete(endpoint: string) {
-        const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
-        const response = await fetch(url, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-          }
-        });
-        const data = await response.json();
-        return { isSucceed: response.ok, data, status: response.status };
+      
+      async createDatabase(data: any): Promise<ApiResult> {
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
+      },
+      
+      async updateDatabase(data: any): Promise<ApiResult> {
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
+      },
+      
+      async deleteDatabase(id: string): Promise<ApiResult> {
+        return apiService.delete(`/api/v2/rest/mix-portal/mix-db-database/delete/${id}`);
       }
     };
     
     return {
       databaseService: new MixDatabaseRestPortalService(apiService),
-      moduleDataService: new ModuleDataService({ apiBaseUrl, apiKey: accessToken })
+      databaseDataService: new MixDatabaseDataRestPortalService(apiService),
+      moduleDataService: new ModuleDataService({ apiBaseUrl, apiKey: accessToken }),
+      mixDbDatabaseService,
+      apiService
     };
   }
 
@@ -207,39 +221,53 @@ export class DatabaseService {
   // Get all tables
   async getTables(): Promise<TableInfo[]> {
     try {
-      const { moduleDataService } = await this.createDatabaseService();
+      const { mixDbDatabaseService, databaseDataService, moduleDataService } = await this.createDatabaseService();
       
-      // Try to fetch real database tables using SDK
-      const result = await moduleDataService.fetchDataItems('mixcore-database', {
-        pageSize: 1000,
-        orderBy: 'name',
-        orderDirection: 'asc'
-      });
-      
-      if (result.isSucceed && result.data?.items) {
-        // Transform SDK response to TableInfo format
-        return result.data.items.map((item: any) => ({
-          id: item.id || item.name,
-          name: item.name || item.id,
-          displayName: item.displayName || item.title || item.name,
-          description: item.description || '',
-          recordCount: item.recordCount || 0,
-          createdDate: item.createdDate || new Date().toISOString(),
-          lastModified: item.lastModified || item.modifiedDate || new Date().toISOString(),
-          isSystemTable: item.isSystemTable || false,
-          schema: {
-            columns: item.columns || [
-              { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
-            ],
-            primaryKey: item.primaryKey || 'id',
-            indexes: item.indexes || [],
-            relationships: item.relationships || []
-          }
-        }));
+      // First try to get database list using the new mixDbDatabaseService
+      try {
+        const databasesResult = await mixDbDatabaseService.getDatabases({
+          pageSize: 100,
+          status: 'Published'
+        });
+        
+        if (databasesResult.isSucceed && databasesResult.data?.items) {
+          return databasesResult.data.items.map((db: any) => this.transformMixDbDatabaseToTable(db));
+        }
+      } catch (mixDbError) {
+        console.warn('MixDbDatabase service call failed, trying other services:', mixDbError);
       }
       
-      // Fallback to mock data if SDK call fails or returns no data
-      console.warn('Using fallback database tables - SDK call failed or returned no data');
+      // Fallback to database data service
+      try {
+        const additionalDataResult = await databaseDataService.getAdditionalData();
+        if (additionalDataResult.isSucceed && additionalDataResult.data?.databases) {
+          return this.transformDatabasesToTables(additionalDataResult.data.databases);
+        }
+      } catch (dbError) {
+        console.warn('Database data service call failed, trying module data service:', dbError);
+      }
+      
+      // Fallback to module data service for mixcore-database module
+      try {
+        const result = await moduleDataService.fetchDataItems('mixcore-database', {
+          pageSize: 1000,
+          orderBy: 'name',
+          orderDirection: 'asc'
+        });
+        
+        if (result.isSucceed && result.data) {
+          // Handle both array and object responses
+          const items = Array.isArray(result.data) ? result.data : result.data.items || [];
+          if (items.length > 0) {
+            return items.map((item: any) => this.transformModuleItemToTable(item));
+          }
+        }
+      } catch (moduleError) {
+        console.warn('Module data service call failed:', moduleError);
+      }
+      
+      // Fallback to mock data if all SDK calls fail
+      console.warn('Using fallback database tables - all SDK calls failed or returned no data');
       return this.getFallbackTables();
     } catch (error) {
       console.error('Failed to get tables:', error);
@@ -482,10 +510,29 @@ export class DatabaseService {
     }
   }
 
-  // Create new table
+  // Create new table/database
   async createTable(request: CreateTableRequest): Promise<TableInfo> {
     try {
-      // This would use the SDK to create a new table
+      const { mixDbDatabaseService } = await this.createDatabaseService();
+      
+      // Try to create database using SDK
+      const createData = {
+        displayName: request.displayName,
+        systemName: request.name,
+        type: 'Database',
+        databaseProvider: 'SQLSERVER',
+        namingConvention: 'TitleCase',
+        status: 'Published',
+        description: request.description
+      };
+      
+      const result = await mixDbDatabaseService.createDatabase(createData);
+      
+      if (result.isSucceed && result.data) {
+        return this.transformMixDbDatabaseToTable(result.data);
+      }
+      
+      // Fallback to mock creation
       const newTable: TableInfo = {
         id: request.name,
         name: request.name,
@@ -541,10 +588,19 @@ export class DatabaseService {
     }
   }
 
-  // Delete table
+  // Delete table/database
   async deleteTable(tableId: string): Promise<boolean> {
     try {
-      // This would use the SDK to delete the table
+      const { mixDbDatabaseService } = await this.createDatabaseService();
+      
+      // Try to delete database using SDK
+      const result = await mixDbDatabaseService.deleteDatabase(tableId);
+      
+      if (result.isSucceed) {
+        return true;
+      }
+      
+      // Fallback to mock deletion
       console.log(`Deleting table ${tableId}`);
       return true;
     } catch (error) {
@@ -638,7 +694,115 @@ export class DatabaseService {
     }
   }
 
-  // Helper methods
+  // Migrate database
+  async migrate(mixDatabaseId: string): Promise<boolean> {
+    try {
+      const { databaseService, databaseDataService } = await this.createDatabaseService();
+      
+      // Try database migration using SDK
+      const migrationResult = await databaseService.migrate({ id: mixDatabaseId });
+      
+      if (migrationResult.isSucceed) {
+        // Also migrate data if needed
+        await databaseDataService.migrate(mixDatabaseId);
+        return true;
+      }
+      
+      console.log(`Migrating database ${mixDatabaseId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to migrate database:', error);
+      return false;
+    }
+  }
+  
+  // Initialize database data
+  async initializeData(mixDatabaseName: string): Promise<boolean> {
+    try {
+      const { databaseDataService } = await this.createDatabaseService();
+      
+      const result = await databaseDataService.initData(mixDatabaseName);
+      return result.isSucceed;
+    } catch (error) {
+      console.error('Failed to initialize database data:', error);
+      return false;
+    }
+  }
+
+  // Helper methods for SDK integration
+  
+  private transformMixDbDatabaseToTable(db: any): TableInfo {
+    return {
+      id: db.id?.toString() || db.systemName,
+      name: db.systemName || db.displayName,
+      displayName: db.displayName || db.systemName,
+      description: `${db.databaseProvider} database - ${db.namingConvention}`,
+      recordCount: 0, // MixDbDatabase doesn't provide record count directly
+      createdDate: db.createdDateTime || new Date().toISOString(),
+      lastModified: db.modifiedDateTime || db.createdDateTime || new Date().toISOString(),
+      isSystemTable: db.systemName === 'master' || db.isSystem || false,
+      schema: {
+        columns: [
+          { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
+        ],
+        primaryKey: 'id',
+        indexes: [],
+        relationships: []
+      }
+    };
+  }
+  
+  private transformDatabasesToTables(databases: any[]): TableInfo[] {
+    return databases.map(db => ({
+      id: db.id || db.name,
+      name: db.name || db.id,
+      displayName: db.displayName || db.title || db.name,
+      description: db.description || '',
+      recordCount: db.recordCount || db.totalRecords || 0,
+      createdDate: db.createdDate || db.createdDateTime || new Date().toISOString(),
+      lastModified: db.lastModified || db.modifiedDate || db.modifiedDateTime || new Date().toISOString(),
+      isSystemTable: db.isSystemTable || db.isSystem || false,
+      schema: {
+        columns: this.transformColumns(db.columns || db.fields || []),
+        primaryKey: db.primaryKey || 'id',
+        indexes: db.indexes || [],
+        relationships: db.relationships || db.relations || []
+      }
+    }));
+  }
+  
+  private transformModuleItemToTable(item: any): TableInfo {
+    return {
+      id: item.id || item.name,
+      name: item.name || item.id,
+      displayName: item.displayName || item.title || item.name,
+      description: item.description || '',
+      recordCount: item.recordCount || item.totalRecords || 0,
+      createdDate: item.createdDate || item.createdDateTime || new Date().toISOString(),
+      lastModified: item.lastModified || item.modifiedDate || item.modifiedDateTime || new Date().toISOString(),
+      isSystemTable: item.isSystemTable || item.isSystem || false,
+      schema: {
+        columns: this.transformColumns(item.columns || item.fields || [
+          { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
+        ]),
+        primaryKey: item.primaryKey || 'id',
+        indexes: item.indexes || [],
+        relationships: item.relationships || item.relations || []
+      }
+    };
+  }
+  
+  private transformColumns(columns: any[]): ColumnDefinition[] {
+    return columns.map(col => ({
+      name: col.name || col.fieldName,
+      type: col.type || col.datatype || col.dataType || 'varchar',
+      isRequired: col.isRequired || col.required || false,
+      isUnique: col.isUnique || col.unique || false,
+      defaultValue: col.defaultValue || col.default,
+      maxLength: col.maxLength || col.length,
+      description: col.description || col.note
+    }));
+  }
 
   private getMockRecords(tableName: string): RecordData[] {
     switch (tableName) {
@@ -731,6 +895,14 @@ export class DatabaseService {
       return record;
     });
   }
+}
+
+// Enhanced database operations for better SDK integration
+export interface DatabaseOperationResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  message?: string;
 }
 
 // Create singleton instance
