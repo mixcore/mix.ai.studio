@@ -82,9 +82,7 @@
       errorMessage = "";
       lastMessageTime = Date.now();
       
-      await chatService.sendMessage(sanitizedInput);
-      
-      // Add user message to chat
+      // Add user message to chat IMMEDIATELY for responsive UX
       chatMessages.update(messages => [
         ...messages,
         {
@@ -104,6 +102,9 @@
         immediateResize();
       });
       
+      // Send message to backend after UI updates
+      await chatService.sendMessage(sanitizedInput);
+      
     } catch (error) {
       console.error("Failed to send message:", error);
       errorMessage = "Failed to send message. Please try again.";
@@ -122,22 +123,21 @@
       e.preventDefault();
       e.stopPropagation();
       
-      // Prevent multiple rapid submissions
-      if ($chatLoading) return;
+      // Only proceed if we can send
+      if (!canSend) return;
       
       // Clear any pending resize timeouts to prevent conflicts
       if (resizeTimeout) {
         clearTimeout(resizeTimeout);
       }
       
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        handleSubmit();
-      });
+      // Send immediately for responsive feel
+      handleSubmit();
     } else if (e.key === "Escape") {
       e.preventDefault();
       chatInput.set("");
       textArea.blur();
+      immediateResize();
     }
   }
 
@@ -228,9 +228,10 @@
     resizeTimeout = setTimeout(autoResize, 50);
   }
 
-  // Character count
+  // Character count and button state
   $: remainingChars = maxLength - $chatInput.length;
   $: isNearLimit = remainingChars < 100;
+  $: canSend = $chatInput.trim().length > 0 && !$chatLoading && !errorMessage;
 
   // Cleanup on destroy
   onDestroy(() => {
@@ -350,15 +351,15 @@
 
       <button
         class={cn(
-          "btn btn-sm transition-colors",
-          $chatInput.trim() && !$chatLoading && !errorMessage ? "btn-primary" : "btn-disabled"
+          "btn btn-sm transition-all",
+          canSend ? "btn-primary hover:btn-primary-focus" : "btn-ghost opacity-50"
         )}
-        disabled={!$chatInput.trim() || $chatLoading || !!errorMessage}
+        disabled={!canSend}
         aria-label="Send message"
-        title="Send message (Enter)"
+        title={canSend ? "Send message (Enter)" : "Type a message to send"}
         on:click={handleSubmit}
       >
-        <Send class="w-4 h-4" aria-hidden="true" />
+        <Send class={cn("w-4 h-4 transition-transform", canSend && "scale-105")} aria-hidden="true" />
       </button>
     </div>
   </div>
