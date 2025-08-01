@@ -1,5 +1,4 @@
 <script lang="ts">
-  // import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
   import { Send, Image, Eye, MessageSquare } from "lucide-svelte";
   import {
     chatInput,
@@ -11,32 +10,39 @@
     llmSettings,
   } from "$lib/stores";
   import { cn } from "$lib/utils";
+  import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
 
   let textArea: HTMLTextAreaElement;
   let fileInput: HTMLInputElement;
 
-export let signalRConnection: any;
+  export let chatService: ChatService | null;
 
   async function askAI() {
     const inputValue = textArea?.value?.trim() || "";
-    if (!signalRConnection || !inputValue) return;
-    await signalRConnection.invoke("AskAI", inputValue);
-    chatMessages.update(messages => [
-      ...messages,
-      {
-        id: Date.now().toString(),
-        content: inputValue,
-        role: "user",
-        timestamp: new Date().toISOString(),
-      }
-    ]);
-    chatInput.set("");
-	chatLoading.set(true);
+    if (!chatService || !inputValue || !chatService.isConnected()) return;
+    
+    try {
+      await chatService.sendMessage(inputValue);
+      chatMessages.update(messages => [
+        ...messages,
+        {
+          id: Date.now().toString(),
+          content: inputValue,
+          role: "user",
+          timestamp: new Date().toISOString(),
+        }
+      ]);
+      chatInput.set("");
+      chatLoading.set(true);
 
-	// Simulate loading state
-	setTimeout(() => {
-	  chatLoading.set(false);
-	}, 1000); // Adjust timeout as needed
+      // Simulate loading state - this should be removed once proper response handling is implemented
+      setTimeout(() => {
+        chatLoading.set(false);
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      chatLoading.set(false);
+    }
   }
 
   async function handleSubmit() {

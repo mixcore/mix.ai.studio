@@ -3,97 +3,57 @@
   import { chatMessages, chatLoading } from "$lib/stores";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
-  import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-
-  // TypeScript class for parsing SignalR message
-  class SignalRMessage {
-    from: string | null;
-    title: string | null;
-    message: string | null;
-    deviceId: string | null;
-    action: string;
-    type: string;
-    data: {
-      isSuccess: boolean;
-      response: string;
-      result: string;
-    };
-    createdDateTime: string;
-
-    constructor(obj: any) {
-      this.from = obj?.from ?? null;
-      this.title = obj?.title ?? null;
-      this.message = obj?.message ?? null;
-      this.deviceId = obj?.deviceId ?? null;
-      this.action = obj?.action ?? "";
-      this.type = obj?.type ?? "";
-      this.data = {
-        isSuccess: obj?.data?.isSuccess ?? false,
-        response: obj?.data?.response ?? "",
-        result: obj?.data?.result ?? "",
-      };
-      this.createdDateTime = obj?.createdDateTime ?? "";
-    }
-  }
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
+  import { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
+  import type { SignalRMessage } from "$lib/javascript-sdk/packages/realtime/src";
 
   let chatContainer: HTMLDivElement;
-  let signalRConnection: any = null;
+  let chatService: ChatService | null = null;
+  const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'https://mixcore.net';
 
-  onMount(() => {
-    const accessToken = localStorage.getItem("mixcore_access_token");
-    signalRConnection = new HubConnectionBuilder()
-      .withUrl("https://mixcore.net/hub/llm_chat", {
-        accessTokenFactory: () => accessToken || "",
-      })
-      .configureLogging(LogLevel.Information)
-      .withAutomaticReconnect()
-      .build();
-
-    signalRConnection.on("receive_message", (msg: string) => {
-      let parsedMsg: SignalRMessage | null = null;
-      if (msg) {
-        try {
-          if (typeof msg === "string" && msg.indexOf("{") === 0) {
-            parsedMsg = new SignalRMessage(JSON.parse(msg));
-          }
-
-          if (typeof msg === "object") {
-            parsedMsg = new SignalRMessage(msg);
-          }
-        } catch (e) {
-          console.warn("Failed to parse message JSON:", e);
+  onMount(async () => {
+    try {
+      chatService = new ChatService({
+        baseUrl: baseUrl,
+        hubPath: "/hub/llm_chat",
+        accessTokenFactory: () => localStorage.getItem("mixcore_access_token") || "",
+        automaticReconnect: true,
+        onConnected: () => {
+          console.log("SignalR connected to llm_chat hub");
+        },
+        onDisconnected: (error) => {
+          console.log("SignalR disconnected", error);
+        },
+        onError: (error) => {
+          console.error("SignalR connection error:", error);
         }
-      }
-      // Append response to chatMessages
-      if (parsedMsg?.data?.response) {
-        chatMessages.update((messages) => [
-          ...messages,
-          {
-            id: Date.now().toString(),
-            content: parsedMsg.data.response,
-            role: "assistant",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-      }
-      console.log("Received message:", parsedMsg);
-    });
-
-    signalRConnection
-      .start()
-      .then(() => {
-        console.log("SignalR connected to llm_chat hub");
-      })
-      .catch((err: unknown) => {
-        console.error("SignalR connection error:", err);
       });
 
-    return () => {
-      if (signalRConnection) {
-        signalRConnection.stop();
-      }
-    };
+      // Handle incoming messages
+      chatService.onMessageReceived((message: SignalRMessage) => {
+        if (message?.data?.response) {
+          chatMessages.update((messages) => [
+            ...messages,
+            {
+              id: Date.now().toString(),
+              content: message.data.response,
+              role: "assistant",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      });
+
+      await chatService.start();
+    } catch (error) {
+      console.error("Failed to initialize chat service:", error);
+    }
+  });
+
+  onDestroy(() => {
+    if (chatService) {
+      chatService.dispose();
+    }
   });
 
   $: if (chatContainer && $chatMessages.length) {
@@ -141,6 +101,6 @@
 
   <!-- Chat Input -->
   <div class="p-4 border-t border-base-300">
-    <ChatInput {signalRConnection} />
+    <ChatInput {chatService} />
   </div>
 </div>
