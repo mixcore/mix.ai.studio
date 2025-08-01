@@ -6,7 +6,7 @@
 	let container: HTMLDivElement;
 	let leftPanel: HTMLDivElement;
 	let rightPanel: HTMLDivElement;
-	let resizer: HTMLDivElement;
+	let resizer: HTMLButtonElement;
 	
 	let isResizing = false;
 	let leftPanelWidth = 30; // Default width percentage

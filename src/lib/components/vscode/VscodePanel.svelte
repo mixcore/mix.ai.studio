@@ -3,7 +3,7 @@
   import CodeEditor from './CodeEditor.svelte';
   import { writable, derived } from 'svelte/store';
 
-  export let files: Record<string, any> | any[] = [];
+  export let files: Record<string, any> = {};
 
   interface FileItem {
     name: string;

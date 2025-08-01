@@ -122,6 +122,7 @@
 
 	function setViewMode(mode: 'preview' | 'database' | 'agent' | 'vscode') {
 		viewMode.set(mode);
+		console.log(`View mode set to: ${mode}`);
 	}
 </script>
 
@@ -140,19 +141,19 @@
 					<span class="text-sm font-medium">Project</span>
 				</li>
 				<li>
-					<button class="flex items-center gap-2" on:click={handleOpenProject}>
+					<button class="flex items-center gap-2" onclick={handleOpenProject}>
 						<FolderOpen class="w-4 h-4" />
 						Open Project
 					</button>
 				</li>
 				<li>
-					<button class="flex items-center gap-2" on:click={handleCreateProject}>
+					<button class="flex items-center gap-2" onclick={handleCreateProject}>
 						<FileText class="w-4 h-4" />
 						New Project
 					</button>
 				</li>
 				<li>
-					<button class="flex items-center gap-2" on:click={handleExportProject}>
+					<button class="flex items-center gap-2" onclick={handleExportProject}>
 						<Share class="w-4 h-4" />
 						Export Project
 					</button>
@@ -166,7 +167,7 @@
 						class="flex items-center gap-2"
 						class:bg-primary={$chatMode === 'default'}
 						class:text-primary-content={$chatMode === 'default'}
-						on:click={() => setChatMode('default')}
+						onclick={() => setChatMode('default')}
 					>
 						<Bot class="w-4 h-4" />
 						Default Mode
@@ -177,7 +178,7 @@
 						class="flex items-center gap-2"
 						class:bg-primary={$chatMode === 'chat-only'}
 						class:text-primary-content={$chatMode === 'chat-only'}
-						on:click={() => setChatMode('chat-only')}
+						onclick={() => setChatMode('chat-only')}
 					>
 						<MessageSquare class="w-4 h-4" />
 						Chat Only
@@ -188,7 +189,7 @@
 						class="flex items-center gap-2"
 						class:bg-primary={$chatMode === 'agent'}
 						class:text-primary-content={$chatMode === 'agent'}
-						on:click={() => setChatMode('agent')}
+						onclick={() => setChatMode('agent')}
 					>
 						<Settings class="w-4 h-4" />
 						Agent Mode
@@ -206,7 +207,7 @@
 						<button
 							class="flex justify-between w-full"
 							class:active={$selectedModel.id === model.id}
-							on:click={() => selectedModel.set(model)}
+							onclick={() => selectedModel.set(model)}
 						>
 							<span>{model.name}</span>
 							<span class="badge badge-ghost badge-sm">{model.provider}</span>
@@ -215,7 +216,7 @@
 				{/each}
 				<div class="divider my-1"></div>
 				<li>
-					<button class="flex items-center gap-2" on:click={() => showProjectSettings = true}>
+					<button class="flex items-center gap-2" onclick={() => showProjectSettings = true}>
 						<Settings class="w-4 h-4" />
 						Project Settings
 					</button>
@@ -237,7 +238,7 @@
 						"btn btn-sm btn-ghost",
 						$deviceMode === 'desktop' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
 					)}
-					on:click={() => setDeviceMode('desktop')}
+					onclick={() => setDeviceMode('desktop')}
 					title="Desktop view"
 				>
 					<Monitor class="w-4 h-4" />
@@ -247,7 +248,7 @@
 						"btn btn-sm btn-ghost",
 						$deviceMode === 'tablet' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
 					)}
-					on:click={() => setDeviceMode('tablet')}
+					onclick={() => setDeviceMode('tablet')}
 					title="Tablet view"
 				>
 					<Tablet class="w-4 h-4" />
@@ -257,7 +258,7 @@
 						"btn btn-sm btn-ghost",
 						$deviceMode === 'mobile' ? "bg-base-100 shadow-sm" : "hover:bg-base-300"
 					)}
-					on:click={() => setDeviceMode('mobile')}
+					onclick={() => setDeviceMode('mobile')}
 					title="Mobile view"
 				>
 					<Smartphone class="w-4 h-4" />
@@ -266,7 +267,7 @@
 
 			<button 
 				class="btn btn-ghost btn-sm"
-				on:click={refreshPreview}
+				onclick={refreshPreview}
 				title="Refresh preview"
 			>
 				<RefreshCw class="w-4 h-4" />
@@ -274,7 +275,7 @@
 			
 			<button 
 				class="btn btn-ghost btn-sm"
-				on:click={openInNewTab}
+				onclick={openInNewTab}
 				title="Open in new tab"
 			>
 				<ExternalLink class="w-4 h-4" />
@@ -294,7 +295,7 @@
 			<!-- Collaboration Tools -->
 			<button 
 	class="btn btn-ghost btn-sm"
-				on:click={() => showInviteModal.set(true)}
+				onclick={() => showInviteModal.set(true)}
 			>
 				<Users class="w-4 h-4" />
 			
@@ -303,7 +304,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'database'}
-				on:click={() => setViewMode('database')}
+				onclick={() => setViewMode('database')}
 				title="Mix Database"
 			>
 				<Database class="w-4 h-4" />
@@ -312,7 +313,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'preview'}
-				on:click={() => setViewMode('preview')}
+				onclick={() => setViewMode('preview')}
 				title="Preview"
 			>
 				<Monitor class="w-4 h-4" />
@@ -321,7 +322,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'agent'}
-				on:click={() => setViewMode('agent')}
+				onclick={() => setViewMode('agent')}
 				title="Agent Flow"
 			>
 				<GitBranch class="w-4 h-4" />
@@ -330,7 +331,7 @@
 			<button 
 				class="btn btn-ghost btn-sm"
 				class:btn-active={$viewMode === 'vscode'}
-				on:click={() => setViewMode('vscode')}
+				onclick={() => setViewMode('vscode')}
 				title="VSCode"
 			>
 				<CodeXml class="w-4 h-4" />

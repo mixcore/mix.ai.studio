@@ -18,8 +18,8 @@
 	
 	onMount(async () => {
 		// Set preview URL to demo page instead of base URL
-		const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'http://localhost:5173';
-		previewUrl.set(`${baseUrl}/demo`);
+		const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'https://mixcore.net';
+		previewUrl.set(`${baseUrl}`);
 
 
 		try {
@@ -84,15 +84,17 @@
 		<div class="flex-1 overflow-hidden">
 			<ResizableLayout>
 				<ChatPanel slot="left" />
-				{#if $viewMode === 'vscode'}
-					<VscodePanel slot="right" files={mockFiles} />
-				{:else if $viewMode === 'preview'}
-					<PreviewPanel slot="right" />
-				{:else if $viewMode === 'database'}
-					<MixDatabasePanel slot="right" />
-				{:else}
-					<AgentFlowPanel slot="right" />
-				{/if}
+				<div slot="right">
+					{#if $viewMode === 'vscode'}
+						<VscodePanel files={mockFiles} />
+					{:else if $viewMode === 'preview'}
+						<PreviewPanel />
+					{:else if $viewMode === 'database'}
+						<MixDatabasePanel />
+					{:else}
+						<AgentFlowPanel />
+					{/if}
+				</div>
 			</ResizableLayout>
 		</div>
 
