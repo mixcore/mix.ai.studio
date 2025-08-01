@@ -3,24 +3,24 @@
 	import { cn } from '$lib/utils';
 	import { markdownToHtml, setupCopyCodeHandlers } from '$lib/utils/markdown';
 	import type { ChatMessage } from '$lib/types';
-	import { onMount, afterUpdate } from 'svelte';
+	import { tick } from 'svelte';
 
 	export let message: ChatMessage;
 
 	let messageContainer: HTMLElement;
 	let renderedContent = '';
 
-	// Render markdown content
+	// Render markdown content and setup copy handlers
 	$: {
 		renderedContent = markdownToHtml(message.content);
-	}
-
-	// Setup copy handlers after content updates
-	afterUpdate(() => {
+		
+		// Setup copy handlers after DOM updates
 		if (messageContainer) {
-			setupCopyCodeHandlers(messageContainer);
+			tick().then(() => {
+				setupCopyCodeHandlers(messageContainer);
+			});
 		}
-	});
+	}
 
 	function copyMessage() {
 		navigator.clipboard.writeText(message.content);

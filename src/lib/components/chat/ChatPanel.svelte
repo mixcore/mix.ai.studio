@@ -36,11 +36,32 @@
           // Turn off loading state immediately when response arrives
           chatLoading.set(false);
           
+          // Extract the actual content string from the response
+          let content = '';
+          if (typeof message.data.response === 'string') {
+            content = message.data.response;
+          } else if (typeof message.data.response === 'object' && message.data.response !== null) {
+            // Handle complex SignalR response structures
+            const responseObj = message.data.response as any;
+            if (responseObj.content) {
+              content = responseObj.content;
+            } else if (responseObj.data) {
+              content = responseObj.data;
+            } else if (responseObj.message) {
+              content = responseObj.message;
+            } else {
+              // Fallback - try to extract meaningful text from the object
+              content = JSON.stringify(message.data.response, null, 2);
+            }
+          } else {
+            content = String(message.data.response);
+          }
+          
           chatMessages.update((messages) => [
             ...messages,
             {
               id: Date.now().toString(),
-              content: message.data.response,
+              content: content,
               role: "assistant",
               timestamp: new Date().toISOString(),
             },
@@ -79,7 +100,7 @@
     {#if $chatMessages.length === 0}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Bot class="w-12 h-12 text-base-content/60 mb-4" />
-        <h3 class="text-lg font-medium mb-2">Welcome to your AI assistant</h3>
+        <h3 class="text-lg font-medium mb-2">Welcome to your Mixcore AI assistant</h3>
         <p class="text-sm text-base-content/60 max-w-sm">
           Describe what you want to build and I'll help you create it step by
           step.

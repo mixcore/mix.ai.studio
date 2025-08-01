@@ -112,6 +112,43 @@ marked.setOptions({
 });
 
 /**
+ * Convert MCP protocol and agent note messages to alert components
+ */
+function processMCPMessages(text: string): string {
+  // Match MCP protocol messages in format: *[MCP Protocol Active: ...]*
+  const mcpPattern = /\*\[MCP Protocol[^:]*:\s*([^\]]+)\]\*/g;
+  
+  // Match agent note messages in format: *(Agent Note: ...)*
+  const agentNotePattern = /\*\(Agent Note:\s*([^)]+)\)\*/g;
+  
+  let result = text;
+  
+  // Process MCP Protocol messages
+  result = result.replace(mcpPattern, (match, content) => {
+    return `<div role="alert" class="alert alert-info alert-soft my-3">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity">
+        <path d="m22 12-4-4v3a9 9 0 0 1-9 9 9 9 0 0 1-9-9 9 9 0 0 1 9-9v3l4-4"/>
+      </svg>
+      <span><strong>MCP Protocol:</strong> ${content.trim()}</span>
+    </div>`;
+  });
+  
+  // Process Agent Note messages
+  result = result.replace(agentNotePattern, (match, content) => {
+    return `<div role="alert" class="alert alert-warning alert-soft my-3">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-check">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <polyline points="16,11 18,13 22,9"/>
+      </svg>
+      <span><strong>Agent Note:</strong> ${content.trim()}</span>
+    </div>`;
+  });
+  
+  return result;
+}
+
+/**
  * Convert markdown text to HTML with syntax highlighting
  */
 export function markdownToHtml(markdown: string): string {
@@ -120,14 +157,17 @@ export function markdownToHtml(markdown: string): string {
   }
   
   try {
-    return marked.parse(markdown);
+    // First process MCP protocol messages
+    const processedText = processMCPMessages(markdown);
+    return marked.parse(processedText);
   } catch (error) {
     console.error('Markdown parsing error:', error);
-    // Fallback to escaped plain text
-    return markdown
+    // Fallback to escaped plain text with MCP processing
+    const escaped = markdown
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/\n/g, '<br>');
+    return processMCPMessages(escaped);
   }
 }
 

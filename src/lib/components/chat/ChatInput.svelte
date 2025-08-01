@@ -95,11 +95,14 @@
         }
       ]);
       
+      // Clear input immediately for responsive feel
       chatInput.set("");
       chatLoading.set(true);
       
-      // Reset textarea height after clearing input
-      setTimeout(() => immediateResize(), 0);
+      // Reset textarea height immediately
+      requestAnimationFrame(() => {
+        immediateResize();
+      });
       
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -119,12 +122,18 @@
       e.preventDefault();
       e.stopPropagation();
       
+      // Prevent multiple rapid submissions
+      if ($chatLoading) return;
+      
       // Clear any pending resize timeouts to prevent conflicts
       if (resizeTimeout) {
         clearTimeout(resizeTimeout);
       }
       
-      handleSubmit();
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        handleSubmit();
+      });
     } else if (e.key === "Escape") {
       e.preventDefault();
       chatInput.set("");

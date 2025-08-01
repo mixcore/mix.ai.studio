@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Markdown Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Markdown List Test</h1>
+    
+    <div class="test">
+        <h3>Test Input (Markdown):</h3>
+        <pre>Hello! I'm your Mix AI Agent here to help you build and manage websites using Mix CMS. How can I assist you today? Would you like to:
+
+1. Create a new website
+2. Update existing content
+3. Configure site settings
+
+Let me know what you'd like to accomplish and I'll guide you through the process using our MCP tools and best practices.</pre>
+    </div>
+    
+    <div class="test">
+        <h3>Expected HTML Output:</h3>
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        // Simulate the markdown conversion
+        const markdownText = `Hello! I'm your Mix AI Agent here to help you build and manage websites using Mix CMS. How can I assist you today? Would you like to:
+
+1. Create a new website
+2. Update existing content  
+3. Configure site settings
+
+Let me know what you'd like to accomplish and I'll guide you through the process using our MCP tools and best practices.`;
+
+        // This would be converted by marked.js in the actual app
+        const expectedHtml = `<p>Hello! I'm your Mix AI Agent here to help you build and manage websites using Mix CMS. How can I assist you today? Would you like to:</p>
+<ol class="list-decimal list-inside my-2 ml-4 space-y-1">
+<li class="text-base-content">Create a new website</li>
+<li class="text-base-content">Update existing content</li>
+<li class="text-base-content">Configure site settings</li>
+</ol>
+<p>Let me know what you'd like to accomplish and I'll guide you through the process using our MCP tools and best practices.</p>`;
+
+        document.getElementById('output').innerHTML = expectedHtml;
+    </script>
+</body>
+</html>
