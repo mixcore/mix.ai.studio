@@ -9,6 +9,7 @@
 
   let chatContainer: HTMLDivElement;
   let chatService: ChatService | null = null;
+  let previousMessageCount = 0;
   const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'https://mixcore.net';
 
   onMount(async () => {
@@ -32,6 +33,9 @@
       // Handle incoming messages
       chatService.onMessageReceived((message: SignalRMessage) => {
         if (message?.data?.response) {
+          // Turn off loading state immediately when response arrives
+          chatLoading.set(false);
+          
           chatMessages.update((messages) => [
             ...messages,
             {
@@ -56,10 +60,16 @@
     }
   });
 
-  $: if (chatContainer && $chatMessages.length) {
-    setTimeout(() => {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }, 100);
+  // Optimized smooth scrolling - only when new messages are added
+  $: if (chatContainer && $chatMessages.length > previousMessageCount) {
+    previousMessageCount = $chatMessages.length;
+    // Use requestAnimationFrame for smoother scrolling
+    requestAnimationFrame(() => {
+      chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: 'smooth'
+      });
+    });
   }
 </script>
 

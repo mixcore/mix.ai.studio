@@ -1,9 +1,26 @@
 <script lang="ts">
 	import { Bot, User, Copy, ThumbsUp, ThumbsDown } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
+	import { markdownToHtml, setupCopyCodeHandlers } from '$lib/utils/markdown';
 	import type { ChatMessage } from '$lib/types';
+	import { onMount, afterUpdate } from 'svelte';
 
 	export let message: ChatMessage;
+
+	let messageContainer: HTMLElement;
+	let renderedContent = '';
+
+	// Render markdown content
+	$: {
+		renderedContent = markdownToHtml(message.content);
+	}
+
+	// Setup copy handlers after content updates
+	afterUpdate(() => {
+		if (messageContainer) {
+			setupCopyCodeHandlers(messageContainer);
+		}
+	});
 
 	function copyMessage() {
 		navigator.clipboard.writeText(message.content);
@@ -34,8 +51,11 @@
 			? 'bg-primary text-primary-content' 
 			: 'bg-base-200'
 	)}>
-		<div class="prose prose-sm max-w-none">
-			{message.content}
+		<div 
+			bind:this={messageContainer}
+			class="prose prose-sm max-w-none markdown-content"
+		>
+			{@html renderedContent}
 		</div>
 		
 		<div class={cn(
