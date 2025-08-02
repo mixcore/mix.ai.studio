@@ -245,9 +245,12 @@ class MixcoreService {
     return this._currentUser;
   }
 
-  private async refreshAuthToken(): Promise<boolean> {
+  async refreshAuthToken(): Promise<boolean> {
     const refreshToken = localStorage.getItem('mixcore_refresh_token');
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      console.warn('No refresh token available');
+      return false;
+    }
     
     try {
       const authService = await this.createAuthService();
@@ -257,13 +260,31 @@ class MixcoreService {
         // Update stored tokens
         this.accessToken = result.data.accessToken;
         localStorage.setItem('mixcore_access_token', result.data.accessToken);
+        
+        // Update refresh token if provided
         if (result.data.refreshToken) {
           localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
         }
+        
+        // Update user info if provided
+        if (result.data.info && this._currentUser) {
+          const updatedUser: User = {
+            ...this._currentUser,
+            id: result.data.info.parentId || result.data.info.username,
+            email: result.data.info.email,
+            username: result.data.info.username,
+            avatar: result.data.Avatar
+          };
+          this._currentUser = updatedUser;
+          localStorage.setItem('mixcore_user', JSON.stringify(updatedUser));
+        }
+        
+        console.log('✅ Token refreshed successfully in MixcoreService');
         return true;
       }
       
       // If refresh fails, clear auth state
+      console.warn('❌ Token refresh failed - invalid response');
       await this.logout();
       return false;
     } catch (error) {
