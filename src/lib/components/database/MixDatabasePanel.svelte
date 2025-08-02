@@ -6,11 +6,7 @@ import {
   Plus, 
   Search, 
   Filter,
-  MoreHorizontal,
-  Edit,
-  Trash2,
   RefreshCw,
-  Eye,
   ArrowLeft,
   ChevronRight,
   Settings,
@@ -34,14 +30,12 @@ import {
 import type { TableInfo } from '$lib/services/database';
 import DatabaseListView from './DatabaseListView.svelte';
 import TablesListView from './TablesListView.svelte';
+import DataView from './DataView.svelte';
 
 	let currentView: 'databases' | 'tables' | 'records' = 'databases';
 	let selectedDatabase: TableInfo | null = null;
 	let searchQuery = '';
-	let records: any[] = [];
-	let recordsPage = 1;
 	let recordsPageSize = 25;
-	let recordsTotal = 0;
 	
 	// Import/Export state
 	let showImportModal = false;
@@ -104,34 +98,12 @@ import TablesListView from './TablesListView.svelte';
 	async function selectTableHandler(table: TableInfo) {
 		selectedTable.set(table);
 		currentView = 'records';
-		await loadRecords(table.name);
-	}
-
-	async function loadRecords(tableName: string) {
-		databaseLoading.set(true);
-		try {
-			const result = await databaseService.getRecords(tableName, {
-				page: recordsPage,
-				pageSize: recordsPageSize,
-				search: searchQuery,
-				searchColumns: ['title', 'name', 'email'] // Adjust based on table
-			});
-			
-			records = result.data;
-			recordsTotal = result.count;
-		} catch (error) {
-			console.error('Failed to load records:', error);
-			records = [];
-		} finally {
-			databaseLoading.set(false);
-		}
 	}
 
 	function goBackToTables() {
 		if (currentView === 'records') {
 			currentView = 'tables';
 			selectedTable.set(null);
-			records = [];
 		} else if (currentView === 'tables') {
 			currentView = 'databases';
 			selectedDatabase = null;
@@ -145,16 +117,13 @@ import TablesListView from './TablesListView.svelte';
 			await loadDatabaseStats();
 		} else if (currentView === 'tables' && selectedDatabase) {
 			await loadTablesForDatabase(selectedDatabase);
-		} else if (currentView === 'records' && $selectedTable) {
-			await loadRecords($selectedTable.name);
 		}
+		// DataView component handles its own refresh for records view
 	}
 
 	async function handleSearch() {
-		if (currentView === 'records' && $selectedTable) {
-			recordsPage = 1; // Reset to first page
-			await loadRecords($selectedTable.name);
-		}
+		// DataView component handles its own search for records view
+		// This function is now mainly for databases and tables view
 	}
 
 	// Reactive statement to filter tables based on search
@@ -351,8 +320,12 @@ import TablesListView from './TablesListView.svelte';
 	  {formatDate}
 	  {formatNumber}
 	  on:select={(e) => selectTableHandler(e.detail.table)}
+	  on:view={(e) => selectTableHandler(e.detail.table)}
 	  on:export={(e) => { selectedTable.set(e.detail.table); showExportModal = true; }}
 	  on:import={(e) => { selectedTable.set(e.detail.table); showImportModal = true; }}
+	  on:settings={(e) => console.log('Settings for table:', e.detail.table)}
+	  on:edit={(e) => console.log('Edit table:', e.detail.table)}
+	  on:delete={(e) => console.log('Delete table:', e.detail.table)}
 	>
 	  <div slot="actions" class="p-4 border-b border-base-200/40">
 		<div class="flex items-center justify-between gap-4">
@@ -388,133 +361,14 @@ import TablesListView from './TablesListView.svelte';
 	  </div>
 	</TablesListView>
 	{:else}
-		<!-- Records View -->
-		<div class="flex-1 flex flex-col">
-			<!-- Search and Actions -->
-			<div class="p-4 border-b border-base-200/40">
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex-1 max-w-md">
-						<div class="join w-full">
-							<input 
-								type="text" 
-								placeholder="Search records..." 
-								class="input input-bordered join-item flex-1"
-								bind:value={searchQuery}
-								on:input={handleSearch}
-							/>
-							<button class="btn btn-outline join-item" on:click={handleSearch}>
-								<Search class="w-4 h-4" />
-							</button>
-						</div>
-					</div>
-					
-					<div class="flex items-center gap-2">
-						<button class="btn btn-outline btn-sm">
-							<Filter class="w-4 h-4" />
-							Filter
-						</button>
-						<button class="btn btn-outline btn-sm" on:click={() => showExportModal = true}>
-							<Download class="w-4 h-4" />
-							Export
-						</button>
-						<button class="btn btn-outline btn-sm" on:click={() => showImportModal = true}>
-							<Upload class="w-4 h-4" />
-							Import
-						</button>
-						<button class="btn btn-primary btn-sm">
-							<Plus class="w-4 h-4" />
-							New Record
-						</button>
-					</div>
-				</div>
-			</div>
-
-			<!-- Records Table -->
-			<div class="flex-1 overflow-auto">
-				{#if $databaseLoading}
-					<div class="flex items-center justify-center h-32">
-						<span class="loading loading-spinner loading-lg"></span>
-					</div>
-				{:else if records.length === 0}
-					<div class="flex items-center justify-center h-32 text-base-content/60">
-						No records found
-					</div>
-				{:else}
-					<table class="table table-pin-rows">
-						<thead>
-							<tr class="bg-base-200/50">
-								{#if $selectedTable}
-									{#each $selectedTable.schema.columns.slice(0, 6) as column}
-										<th class="capitalize">{column.name.replace('_', ' ')}</th>
-									{/each}
-								{/if}
-								<th></th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each records as record}
-								<tr class="hover:bg-base-50">
-									{#if $selectedTable}
-										{#each $selectedTable.schema.columns.slice(0, 6) as column}
-											<td class="font-mono text-sm">
-												{#if column.type === 'timestamp'}
-													{formatDate(record[column.name])}
-												{:else if column.name === 'status'}
-													<div class="badge {record[column.name] === 'published' ? 'badge-success' : 'badge-warning'} badge-sm">
-														{record[column.name]}
-													</div>
-												{:else}
-													{record[column.name] || '-'}
-												{/if}
-											</td>
-										{/each}
-									{/if}
-									<td>
-										<div class="dropdown dropdown-end">
-											<button class="btn btn-ghost btn-sm btn-circle" tabindex="0">
-												<MoreHorizontal class="w-4 h-4" />
-											</button>
-											<ul class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-												<li><button><Eye class="w-4 h-4" /> View</button></li>
-												<li><button><Edit class="w-4 h-4" /> Edit</button></li>
-												<li><hr /></li>
-												<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete</button></li>
-											</ul>
-										</div>
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/if}
-			</div>
-
-			<!-- Pagination -->
-			<div class="p-4 border-t border-base-200/40">
-				<div class="flex items-center justify-between">
-					<div class="text-sm text-base-content/60">
-						Showing {Math.min((recordsPage - 1) * recordsPageSize + 1, recordsTotal)}-{Math.min(recordsPage * recordsPageSize, recordsTotal)} of {formatNumber(recordsTotal)} records
-					</div>
-					<div class="join">
-						<button 
-							class="join-item btn btn-sm" 
-							disabled={recordsPage <= 1}
-							on:click={() => { recordsPage = Math.max(1, recordsPage - 1); $selectedTable && loadRecords($selectedTable.name); }}
-						>
-							«
-						</button>
-						<button class="join-item btn btn-sm btn-active">{recordsPage}</button>
-						<button 
-							class="join-item btn btn-sm" 
-							disabled={recordsPage * recordsPageSize >= recordsTotal}
-							on:click={() => { recordsPage++; $selectedTable && loadRecords($selectedTable.name); }}
-						>
-							»
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
+		<!-- Records View using DataView component -->
+		<DataView 
+			tableName={$selectedTable?.name || ''}
+			initialPageSize={recordsPageSize}
+			on:viewRecord={(e) => console.log('View record:', e.detail)}
+			on:editRecord={(e) => console.log('Edit record:', e.detail)}
+			on:deleteRecord={(e) => console.log('Delete record:', e.detail)}
+		/>
 	{/if}
 </div>
 

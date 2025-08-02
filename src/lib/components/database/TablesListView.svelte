@@ -74,14 +74,14 @@ function handleDelete(table: TableInfo) {
 											<MoreHorizontal class="w-4 h-4" />
 										</button>
 										<ul class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-											<li><button><Eye class="w-4 h-4" /> View Records</button></li>
-											<li><button><Settings class="w-4 h-4" /> Table Settings</button></li>
-											<li><button><Edit class="w-4 h-4" /> Edit Schema</button></li>
+											<li><button on:click={() => handleView(table)}><Eye class="w-4 h-4" /> View Records</button></li>
+											<li><button on:click={() => handleSettings(table)}><Settings class="w-4 h-4" /> Table Settings</button></li>
+											<li><button on:click={() => handleEdit(table)}><Edit class="w-4 h-4" /> Edit Schema</button></li>
 											<li><hr /></li>
 											<li><button on:click={() => handleExport(table)}><Download class="w-4 h-4" /> Export Data</button></li>
 											<li><button on:click={() => handleImport(table)}><Upload class="w-4 h-4" /> Import Data</button></li>
 											<li><hr /></li>
-											<li><button class="text-error"><Trash2 class="w-4 h-4" /> Delete Table</button></li>
+											<li><button on:click={() => handleDelete(table)} class="text-error"><Trash2 class="w-4 h-4" /> Delete Table</button></li>
 										</ul>
 									</div>
 								</div>
