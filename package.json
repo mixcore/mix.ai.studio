@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:http": "vite dev",
-		"build": "vite build",
+		"build": "cd src/lib/javascript-sdk && pnpm install && pnpm run build && cd ../../.. && vite build",
 		"preview": "vite preview",
 		"preview:ssl": "vite preview --https",
 		"prepare": "svelte-kit sync || echo ''",
