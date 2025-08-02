@@ -65,7 +65,7 @@ export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
 export const showPublishModal = writable(false);
 export const showChatPanel = writable(true);
-export const deviceMode = writable<'desktop' | 'tablet' | 'mobile' | 'responsive'>('desktop');
+export const deviceMode = writable<'desktop' | 'tablet' | 'mobile' | 'responsive'>('responsive');
 
 // Mixcore integration stores
 export const mixcoreConnected = writable(false);
