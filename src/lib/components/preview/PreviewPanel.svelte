@@ -1,7 +1,29 @@
+<!--
+TODO: For full two-way URL sync with cross-origin iframes, add this script to the <head> of your iframe app:
+
+<script>
+(function() {
+  function sendUrl() {
+	window.parent.postMessage({ type: 'mixcore:navigate', url: window.location.href }, '*');
+  }
+  window.addEventListener('hashchange', sendUrl);
+  window.addEventListener('popstate', sendUrl);
+  const origPushState = history.pushState;
+  const origReplaceState = history.replaceState;
+  history.pushState = function() { origPushState.apply(this, arguments); sendUrl(); };
+  history.replaceState = function() { origReplaceState.apply(this, arguments); sendUrl(); };
+  sendUrl();
+})();
+</script>
+-->
 <script lang="ts">
-	import { RefreshCw } from 'lucide-svelte';
-	import { previewUrl, previewLoading, showCodeView, deviceMode } from '$lib/stores';
-	import { cn } from '$lib/utils';
+import { RefreshCw } from 'lucide-svelte';
+import { previewUrl, previewLoading, showCodeView, deviceMode } from '$lib/stores';
+import { previewIframeUrl } from '$lib/stores/previewIframeUrl';
+import { cn } from '$lib/utils';
+
+// Keep previewIframeUrl in sync with previewUrl by default
+$: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
 
 
 	$: containerClass = cn(
@@ -200,14 +222,72 @@
 								</div>
 							</div>
 						{:else}
-							<iframe
-								src={$previewUrl}
-								class="w-full h-full border-0 rounded-lg"
-								title="App Preview - Viewport: {viewportMeta} | DPI: {deviceConfig.dpi}"
-								sandbox="allow-scripts allow-same-origin allow-forms"
-								style="{deviceSpecificStyle}; background: white;"
-								loading="lazy"
-							></iframe>
+<iframe
+	id="preview-iframe"
+	src={$previewIframeUrl || $previewUrl}
+	class="w-full h-full border-0 rounded-lg"
+	title="App Preview - Viewport: {viewportMeta} | DPI: {deviceConfig.dpi}"
+	sandbox="allow-scripts allow-same-origin allow-forms"
+	style="{deviceSpecificStyle}; background: white;"
+	loading="lazy"
+	on:load={() => {
+		// When iframe loads, update the store with its current URL
+		const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement | null;
+		if (!iframe) return;
+		const win = iframe.contentWindow;
+		if (!win) return;
+		const updateUrl = () => {
+			let newUrl = '';
+			try {
+				if (iframe.contentWindow) {
+					newUrl = iframe.contentWindow.location.href;
+				} else {
+					newUrl = iframe.src;
+				}
+			} catch (e) {
+				// Cross-origin: fallback to src
+				newUrl = iframe.src;
+			}
+			if ($previewIframeUrl !== newUrl) {
+				previewIframeUrl.set(newUrl);
+			}
+		};
+		updateUrl();
+		// Remove previous listeners if any
+		if ((win as any).__mixcore_urlbar_cleanup) {
+			(win as any).__mixcore_urlbar_cleanup();
+		}
+		// Listen for navigation events inside the iframe
+		const hashListener = () => updateUrl();
+		const popListener = () => updateUrl();
+		win.addEventListener('hashchange', hashListener);
+		win.addEventListener('popstate', popListener);
+		// Store cleanup on window for next reload
+		(win as any).__mixcore_urlbar_cleanup = () => {
+			win.removeEventListener('hashchange', hashListener);
+			win.removeEventListener('popstate', popListener);
+			delete (win as any).__mixcore_urlbar_cleanup;
+		};
+		// Listen for postMessage from iframe for SPA navigation
+		// Always remove previous message listener before adding a new one
+		if ((window as any).__mixcore_urlbar_global_cleanup_message) {
+			(window as any).__mixcore_urlbar_global_cleanup_message();
+		}
+		const messageListener = (event: MessageEvent) => {
+			if (event.source === win && event.data && event.data.type === 'mixcore:navigate') {
+				if (typeof event.data.url === 'string') {
+					previewIframeUrl.set(event.data.url);
+				}
+			}
+		};
+		window.addEventListener('message', messageListener);
+		// Clean up message listener globally
+		(window as any).__mixcore_urlbar_global_cleanup_message = () => {
+			window.removeEventListener('message', messageListener);
+			delete (window as any).__mixcore_urlbar_global_cleanup_message;
+		};
+	}}
+></iframe>
 						{/if}
 					</div>
 				</div>

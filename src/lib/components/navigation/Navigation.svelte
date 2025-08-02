@@ -21,6 +21,7 @@
 		CodeXml,
 		Fullscreen
 	} from 'lucide-svelte';
+import UrlBar from './UrlBar.svelte';
 	import { cn } from '$lib/utils';
 	import {
 		showInviteModal,
@@ -294,10 +295,7 @@ function setDeviceMode(mode: 'desktop' | 'tablet' | 'mobile' | 'responsive') {
 				</button>
 
 				<!-- URL Bar -->
-				<div class="flex items-center gap-1 bg-base-200 rounded-md px-2 py-1 text-xs">
-					<Globe class="w-4 h-4 text-base-content/60" />
-					<span class="text-base-content/70">{$previewUrl}</span>
-				</div>
+				<UrlBar />
 			{/if}
 		</div>
 	</div>
