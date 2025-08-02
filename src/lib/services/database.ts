@@ -51,10 +51,17 @@ export class DatabaseService {
       const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
       let token = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
       // Do NOT add 'Bearer ' prefix. The SDK will add it automatically.
-      // Create ApiService instance with correct config property name
+      // Create ApiService instance with correct config property name and onRefreshToken for auto-refresh
       const apiService = new ApiService({
         apiBaseUrl: apiBaseUrl,
-        apiKey: token
+        apiKey: token,
+        async onRefreshToken() {
+          const refreshed = await mixcoreService.refreshAuthToken();
+          if (refreshed) {
+            return localStorage.getItem('mixcore_access_token');
+          }
+          return null;
+        }
       });
       this.mixDbClient = createMixDbClient(apiService);
       // Debug log
