@@ -1,26 +1,24 @@
 <script lang="ts">
 	import { Bot, User, Copy, ThumbsUp, ThumbsDown } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
-	import { markdownToHtml, setupCopyCodeHandlers } from '$lib/utils/markdown';
 	import type { ChatMessage } from '$lib/types';
-	import { tick } from 'svelte';
+import { Carta, Markdown } from 'carta-md';
+	import { emoji } from '@cartamd/plugin-emoji';
+	import { code } from '@cartamd/plugin-code';
+	import { anchor } from '@cartamd/plugin-anchor';
+	import { component } from '@cartamd/plugin-component';
+	import { svelte, initializeComponents } from '@cartamd/plugin-component/svelte';
+	import 'carta-md/default.css';
+	import '@cartamd/plugin-emoji/default.css';
+	import '@cartamd/plugin-code/default.css';
+	import '@cartamd/plugin-anchor/default.css';
 
 	export let message: ChatMessage;
 
-	let messageContainer: HTMLElement;
-	let renderedContent = '';
-
-	// Render markdown content and setup copy handlers
-	$: {
-		renderedContent = markdownToHtml(message.content);
-		
-		// Setup copy handlers after DOM updates
-		if (messageContainer) {
-			tick().then(() => {
-				setupCopyCodeHandlers(messageContainer);
-			});
-		}
-	}
+	// Carta instance for rendering markdown with emoji, code, and anchor support
+	const carta = new Carta({
+		extensions: [emoji(), code(), anchor(), component([], initializeComponents)]
+	});
 
 	function copyMessage() {
 		navigator.clipboard.writeText(message.content);
@@ -51,19 +49,14 @@
 			? 'bg-primary text-primary-content' 
 			: 'bg-base-200'
 	)}>
-		<div 
-			bind:this={messageContainer}
-			class="prose prose-sm max-w-none markdown-content"
-		>
-			{@html renderedContent}
+		<div class="prose prose-sm max-w-none markdown-content">
+			<Markdown value={message.content} {carta} />
 		</div>
-		
 		<div class={cn(
 			"flex items-center gap-2 mt-2 text-xs",
 			message.role === 'user' ? 'text-primary-content/70' : 'text-base-content/60'
 		)}>
 			<span>{formatTimestamp(message.timestamp)}</span>
-			
 			{#if message.role === 'assistant'}
 				<div class="flex items-center gap-1 ml-auto">
 					<button 

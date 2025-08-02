@@ -38,10 +38,15 @@
 		]
 	},
 	"dependencies": {
+		"@cartamd/plugin-anchor": "^2.2.0",
+		"@cartamd/plugin-code": "^4.2.0",
+		"@cartamd/plugin-component": "^1.1.1",
+		"@cartamd/plugin-emoji": "^4.3.0",
 		"@microsoft/signalr": "^9.0.6",
 		"@monaco-editor/loader": "^1.5.0",
 		"@types/marked": "^6.0.0",
 		"axios": "^1.11.0",
+		"carta-md": "^4.11.1",
 		"clsx": "^2.1.1",
 		"crypto-js": "^4.2.0",
 		"eventsource": "^4.0.0",
