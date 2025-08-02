@@ -24,7 +24,7 @@ import type {
 } from '$lib/javascript-sdk/packages/database/src/types';
 
 import { MixDbClient, createMixDbClient } from '$lib/javascript-sdk/packages/database/src/mix-db-client';
-import { ApiService } from '$lib/javascript-sdk/packages/api/src/api-services';
+import { ApiService } from '$lib/javascript-sdk/packages/api/dist';
 
 import { mixcoreService, MixcoreError } from './mixcore';
 import {
@@ -50,15 +50,11 @@ export class DatabaseService {
     if (!this.mixDbClient) {
       const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
       let token = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
-      if (token && !token.startsWith('Bearer ')) {
-        token = `Bearer ${token}`;
-      }
-      // Create ApiService instance with base URL and Authorization header
+      // Do NOT add 'Bearer ' prefix. The SDK will add it automatically.
+      // Create ApiService instance with correct config property name
       const apiService = new ApiService({
-        baseUrl: apiBaseUrl,
-        headers: {
-          Authorization: token
-        }
+        apiBaseUrl: apiBaseUrl,
+        apiKey: token
       });
       this.mixDbClient = createMixDbClient(apiService);
       // Debug log
