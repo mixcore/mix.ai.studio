@@ -126,18 +126,17 @@ export class DatabaseService {
     const { ApiService } = await import('$lib/javascript-sdk/packages/api/src/api-services');
     
     const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
-    // Do not fetch accessToken directly; let mixcoreService handle it
-    // Always provide apiKey for authenticated requests
+
+    // Always provide apiKey and onRefreshToken for authenticated requests
     const apiKey = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
     const apiService = new ApiService({
       apiBaseUrl,
-      apiKey
+      apiKey,
+      onRefreshToken: async () => {
+        const refreshed = await mixcoreService.refreshAuthToken();
+        return refreshed ? (mixcoreService as any).accessToken : null;
+      }
     });
-
-    // Helper to wrap API calls with token refresh/retry logic
-    function wrap<T>(fn: () => Promise<T>): Promise<T> {
-      return mixcoreService.makeAuthenticatedRequest(fn);
-    }
 
     // Create MixDbDatabase service for database listing
     const mixDbDatabaseService = {
@@ -164,23 +163,23 @@ export class DatabaseService {
           columns: 'id,displayName,systemName,type,createdDatetime',
           ...params
         };
-        return wrap(() => apiService.get('/api/v2/rest/mix-portal/mix-db-database', queryParams));
+        return apiService.get('/api/v2/rest/mix-portal/mix-db-database', queryParams);
       },
 
       async getDatabaseById(id: string): Promise<ApiResult> {
-        return wrap(() => apiService.get(`/api/v2/rest/mix-portal/mix-db-database/get-by/${id}`));
+        return apiService.get(`/api/v2/rest/mix-portal/mix-db-database/get-by/${id}`);
       },
 
       async createDatabase(data: any): Promise<ApiResult> {
-        return wrap(() => apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data));
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
       },
 
       async updateDatabase(data: any): Promise<ApiResult> {
-        return wrap(() => apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data));
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
       },
 
       async deleteDatabase(id: string): Promise<ApiResult> {
-        return wrap(() => apiService.delete(`/api/v2/rest/mix-portal/mix-db-database/delete/${id}`));
+        return apiService.delete(`/api/v2/rest/mix-portal/mix-db-database/delete/${id}`);
       }
     };
 
@@ -205,23 +204,23 @@ export class DatabaseService {
           mixDbDatabaseId: mixDbDatabaseId.toString(),
           ...params
         };
-        return wrap(() => apiService.get('/api/v2/rest/mix-portal/mix-db-table', queryParams));
+        return apiService.get('/api/v2/rest/mix-portal/mix-db-table', queryParams);
       },
 
       async getTableById(id: string): Promise<ApiResult> {
-        return wrap(() => apiService.get(`/api/v2/rest/mix-portal/mix-db-table/get-by/${id}`));
+        return apiService.get(`/api/v2/rest/mix-portal/mix-db-table/get-by/${id}`);
       },
 
       async createTable(data: any): Promise<ApiResult> {
-        return wrap(() => apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data));
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data);
       },
 
       async updateTable(data: any): Promise<ApiResult> {
-        return wrap(() => apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data));
+        return apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data);
       },
 
       async deleteTable(id: string): Promise<ApiResult> {
-        return wrap(() => apiService.delete(`/api/v2/rest/mix-portal/mix-db-table/delete/${id}`));
+        return apiService.delete(`/api/v2/rest/mix-portal/mix-db-table/delete/${id}`);
       }
     };
 
