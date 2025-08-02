@@ -21,6 +21,18 @@ function handleExport(table: TableInfo) {
 function handleImport(table: TableInfo) {
 	dispatch('import', { table });
 }
+function handleSettings(table: TableInfo) {
+	dispatch('settings', { table });
+}
+function handleView(table: TableInfo) {
+	dispatch('view', { table });
+}
+function handleEdit(table: TableInfo) {
+	dispatch('edit', { table });
+}
+function handleDelete(table: TableInfo) {
+	dispatch('delete', { table });
+}
 </script>
 
 <div class="flex-1 flex flex-col">
@@ -57,7 +69,7 @@ function handleImport(table: TableInfo) {
 								</div>
 								<div class="flex items-center gap-2">
 									<ChevronRight class="w-4 h-4 text-base-content/40" />
-									<div class="dropdown dropdown-end">
+									<div class="dropdown dropdown-end" on:click|stopPropagation>
 										<button class="btn btn-ghost btn-sm btn-circle" tabindex="0">
 											<MoreHorizontal class="w-4 h-4" />
 										</button>
