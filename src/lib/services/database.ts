@@ -22,8 +22,21 @@ import type {
   FilterCondition,
   DatabaseOperationResult
 } from '$lib/javascript-sdk/packages/database/src/types';
+
 import { MixDbClient, createMixDbClient } from '$lib/javascript-sdk/packages/database/src/mix-db-client';
+import { ApiService } from '$lib/javascript-sdk/packages/api/src/api-services';
+
 import { mixcoreService, MixcoreError } from './mixcore';
+import {
+  transformMixDbDatabaseToTable,
+  transformMixDbTableToTable,
+  transformDatabasesToTables,
+  transformModuleItemToTable,
+  transformColumns,
+  convertToCSV,
+  parseCSV,
+  applyFilter
+} from '$lib/javascript-sdk/packages/database/src/database-utils';
 
 export class DatabaseService {
   constructor() {
@@ -36,16 +49,20 @@ export class DatabaseService {
   private getMixDbClient(): MixDbClient {
     if (!this.mixDbClient) {
       const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
-      const apiKey = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
+      let token = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
+      if (token && !token.startsWith('Bearer ')) {
+        token = `Bearer ${token}`;
+      }
+      // Create ApiService instance with base URL and Authorization header
       const apiService = new ApiService({
-        apiBaseUrl,
-        apiKey,
-        onRefreshToken: async () => {
-          const refreshed = await mixcoreService.refreshAuthToken();
-          return refreshed ? (mixcoreService as any).accessToken : null;
+        baseUrl: apiBaseUrl,
+        headers: {
+          Authorization: token
         }
       });
       this.mixDbClient = createMixDbClient(apiService);
+      // Debug log
+      console.log('MixDB Client created with', { apiBaseUrl, token });
     }
     return this.mixDbClient;
   }
@@ -84,7 +101,7 @@ export class DatabaseService {
     try {
       const result = await this.getMixDbClient().listDatabases({ pageSize: 100, status: 'Published' });
       if (result.isSucceed && result.data?.items) {
-        return result.data.items.map((db: any) => this.transformMixDbDatabaseToTable(db));
+        return result.data.items.map((db: any) => transformMixDbDatabaseToTable(db));
       }
       // Fallback to mock data if SDK call fails
       console.warn('Using fallback database tables - SDK call failed or returned no data');
@@ -104,7 +121,7 @@ export class DatabaseService {
     try {
       const result = await this.getMixDbClient().listTables(databaseId, { pageSize: 100, status: 'Published' });
       if (result.isSucceed && result.data?.items) {
-        return result.data.items.map((table: any) => this.transformMixDbTableToTable(table));
+        return result.data.items.map((table: any) => transformMixDbTableToTable(table));
       }
       // Fallback to mock data
       console.warn(`No tables found for database ${databaseId}, using fallback`);
@@ -237,17 +254,27 @@ export class DatabaseService {
         searchColumns = []
       } = options;
 
-      // Build query using SDK
-      // const query = new MixQuery();
-      
-      // Mock data for now
-      const mockData = this.getMockRecords(tableName);
-      
+      // Use fallback/mock data for now
+      const allTables = this.getFallbackTables();
+      const table = allTables.find(t => t.id === tableName || t.name === tableName);
+      let mockData: RecordData[] = [];
+      if (table && table.schema && table.schema.columns) {
+        // Generate some mock records based on schema (simple example)
+        mockData = Array.from({ length: table.recordCount || 10 }, (_, i) => {
+          const record: Record<string, any> = {};
+          for (const col of table.schema.columns) {
+            record[col.name] = `${col.name}_${i+1}`;
+          }
+          record['id'] = i + 1;
+          return record;
+        });
+      }
+
       // Apply search if provided
       let filteredData = mockData;
       if (search && searchColumns.length > 0) {
-        filteredData = mockData.filter(record => 
-          searchColumns.some(column => 
+        filteredData = mockData.filter((record: RecordData) =>
+          searchColumns.some((column: string) =>
             record[column]?.toString().toLowerCase().includes(search.toLowerCase())
           )
         );
@@ -255,13 +282,13 @@ export class DatabaseService {
 
       // Apply filters
       for (const filter of filters) {
-        filteredData = filteredData.filter(record => 
-          this.applyFilter(record, filter)
+        filteredData = filteredData.filter((record: RecordData) =>
+          applyFilter(record, filter)
         );
       }
 
       // Apply ordering
-      filteredData.sort((a, b) => {
+      filteredData.sort((a: RecordData, b: RecordData) => {
         const aVal = a[orderBy];
         const bVal = b[orderBy];
         const compareResult = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
@@ -361,7 +388,7 @@ export class DatabaseService {
       };
       const result = await this.getMixDbClient().createDatabase(createData);
       if (result.isSucceed && result.data) {
-        return this.transformMixDbDatabaseToTable(result.data);
+        return transformMixDbDatabaseToTable(result.data);
       }
       // Fallback to mock creation
       const newTable: TableInfo = {
@@ -469,7 +496,7 @@ export class DatabaseService {
           mimeType = 'application/json';
           break;
         case 'csv':
-          content = this.convertToCSV(records.data);
+          content = convertToCSV(records.data);
           mimeType = 'text/csv';
           break;
         case 'xlsx':
@@ -497,7 +524,7 @@ export class DatabaseService {
       if (file.name.endsWith('.json')) {
         data = JSON.parse(content);
       } else if (file.name.endsWith('.csv')) {
-        data = this.parseCSV(content);
+        data = parseCSV(content);
       } else {
         throw new Error('Unsupported file format');
       }
@@ -512,218 +539,13 @@ export class DatabaseService {
           console.error('Failed to import record:', error);
         }
       }
-
       return importedCount;
     } catch (error) {
       console.error('Failed to import table:', error);
       throw error;
     }
   }
-
-  // Migrate database
-  async migrate(mixDatabaseId: string): Promise<boolean> {
-    // Not implemented: MixDbClient does not expose migration yet
-    console.warn('migrate() is not implemented with MixDbClient.');
-    return false;
-  }
-  
-  // Initialize database data
-  async initializeData(mixDatabaseName: string): Promise<boolean> {
-    // Not implemented: MixDbClient does not expose initializeData yet
-    console.warn('initializeData() is not implemented with MixDbClient.');
-    return false;
-  }
-
-  // Helper methods for SDK integration
-  
-  private transformMixDbDatabaseToTable(db: any): TableInfo {
-    return {
-      id: db.id?.toString() || db.systemName,
-      name: db.systemName || db.displayName,
-      displayName: db.displayName || db.systemName,
-      description: `${db.databaseProvider} database - ${db.namingConvention}`,
-      recordCount: 0, // MixDbDatabase doesn't provide record count directly
-      createdDate: db.createdDateTime || new Date().toISOString(),
-      lastModified: db.modifiedDateTime || db.createdDateTime || new Date().toISOString(),
-      isSystemTable: db.systemName === 'master' || db.isSystem || false,
-      schema: {
-        columns: [
-          { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
-        ],
-        primaryKey: 'id',
-        indexes: [],
-        relationships: []
-      }
-    };
-  }
-  
-  private transformMixDbTableToTable(table: any): TableInfo {
-    return {
-      id: table.id?.toString() || table.systemName,
-      name: table.systemName || table.displayName,
-      displayName: table.displayName || table.systemName,
-      description: table.description || `Database table in ${table.mixDbDatabaseName}`,
-      recordCount: table.recordCount || 0,
-      createdDate: table.createdDateTime || new Date().toISOString(),
-      lastModified: table.modifiedDateTime || table.createdDateTime || new Date().toISOString(),
-      isSystemTable: table.isSystem || false,
-      schema: {
-        columns: this.transformColumns(table.columns || table.fields || [
-          { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
-        ]),
-        primaryKey: table.primaryKey || 'id',
-        indexes: table.indexes || [],
-        relationships: table.relationships || table.relations || []
-      }
-    };
-  }
-  
-  private transformDatabasesToTables(databases: any[]): TableInfo[] {
-    return databases.map(db => ({
-      id: db.id || db.name,
-      name: db.name || db.id,
-      displayName: db.displayName || db.title || db.name,
-      description: db.description || '',
-      recordCount: db.recordCount || db.totalRecords || 0,
-      createdDate: db.createdDate || db.createdDateTime || new Date().toISOString(),
-      lastModified: db.lastModified || db.modifiedDate || db.modifiedDateTime || new Date().toISOString(),
-      isSystemTable: db.isSystemTable || db.isSystem || false,
-      schema: {
-        columns: this.transformColumns(db.columns || db.fields || []),
-        primaryKey: db.primaryKey || 'id',
-        indexes: db.indexes || [],
-        relationships: db.relationships || db.relations || []
-      }
-    }));
-  }
-  
-  private transformModuleItemToTable(item: any): TableInfo {
-    return {
-      id: item.id || item.name,
-      name: item.name || item.id,
-      displayName: item.displayName || item.title || item.name,
-      description: item.description || '',
-      recordCount: item.recordCount || item.totalRecords || 0,
-      createdDate: item.createdDate || item.createdDateTime || new Date().toISOString(),
-      lastModified: item.lastModified || item.modifiedDate || item.modifiedDateTime || new Date().toISOString(),
-      isSystemTable: item.isSystemTable || item.isSystem || false,
-      schema: {
-        columns: this.transformColumns(item.columns || item.fields || [
-          { name: 'id', type: 'bigint', isRequired: true, isUnique: true, description: 'Primary key' }
-        ]),
-        primaryKey: item.primaryKey || 'id',
-        indexes: item.indexes || [],
-        relationships: item.relationships || item.relations || []
-      }
-    };
-  }
-  
-  private transformColumns(columns: any[]): ColumnDefinition[] {
-    return columns.map(col => ({
-      name: col.name || col.fieldName,
-      type: col.type || col.datatype || col.dataType || 'varchar',
-      isRequired: col.isRequired || col.required || false,
-      isUnique: col.isUnique || col.unique || false,
-      defaultValue: col.defaultValue || col.default,
-      maxLength: col.maxLength || col.length,
-      description: col.description || col.note
-    }));
-  }
-
-  private getMockRecords(tableName: string): RecordData[] {
-    switch (tableName) {
-      case 'users':
-        return [
-          { id: 1, email: 'admin@mixcore.org', name: 'Admin User', created_at: '2025-01-10', updated_at: '2025-01-13' },
-          { id: 2, email: 'editor@mixcore.org', name: 'Editor User', created_at: '2025-01-11', updated_at: '2025-01-12' },
-          { id: 3, email: 'developer@mixcore.org', name: 'Developer User', created_at: '2025-01-12', updated_at: '2025-01-13' }
-        ];
-      case 'posts':
-        return [
-          { id: 1, title: 'Welcome to Mixcore', author_id: 1, status: 'published', created_at: '2025-01-10', published_at: '2025-01-10' },
-          { id: 2, title: 'Getting Started Guide', author_id: 2, status: 'draft', created_at: '2025-01-11', published_at: null },
-          { id: 3, title: 'API Documentation', author_id: 3, status: 'published', created_at: '2025-01-12', published_at: '2025-01-12' },
-          { id: 4, title: 'Feature Updates', author_id: 1, status: 'published', created_at: '2025-01-13', published_at: '2025-01-13' }
-        ];
-      case 'categories':
-        return [
-          { id: 1, name: 'Technology', slug: 'technology', description: 'Tech-related content', color: '#3b82f6', created_at: '2025-01-10' },
-          { id: 2, name: 'Tutorials', slug: 'tutorials', description: 'How-to guides and tutorials', color: '#10b981', created_at: '2025-01-10' },
-          { id: 3, name: 'News', slug: 'news', description: 'Latest news and updates', color: '#f59e0b', created_at: '2025-01-10' }
-        ];
-      default:
-        return [];
-    }
-  }
-
-  private applyFilter(record: RecordData, filter: FilterCondition): boolean {
-    const value = record[filter.column];
-    
-    switch (filter.operator) {
-      case 'eq':
-        return value === filter.value;
-      case 'neq':
-        return value !== filter.value;
-      case 'gt':
-        return value > filter.value;
-      case 'gte':
-        return value >= filter.value;
-      case 'lt':
-        return value < filter.value;
-      case 'lte':
-        return value <= filter.value;
-      case 'like':
-        return value?.toString().toLowerCase().includes(filter.value.toLowerCase());
-      case 'in':
-        return Array.isArray(filter.value) && filter.value.includes(value);
-      case 'notin':
-        return Array.isArray(filter.value) && !filter.value.includes(value);
-      case 'isnull':
-        return value === null || value === undefined;
-      case 'isnotnull':
-        return value !== null && value !== undefined;
-      default:
-        return true;
-    }
-  }
-
-  private convertToCSV(data: RecordData[]): string {
-    if (data.length === 0) return '';
-    
-    const headers = Object.keys(data[0]);
-    const csvRows = [
-      headers.join(','),
-      ...data.map(row => 
-        headers.map(header => {
-          const value = row[header];
-          return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
-        }).join(',')
-      )
-    ];
-    
-    return csvRows.join('\n');
-  }
-
-  private parseCSV(content: string): RecordData[] {
-    const lines = content.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
-    
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    
-    return lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-      const record: RecordData = {};
-      
-      headers.forEach((header, index) => {
-        record[header] = values[index] || '';
-      });
-      
-      return record;
-    });
-  }
 }
-
-// ...existing code...
 
 // Create singleton instance
 let databaseService: DatabaseService | null = null;
