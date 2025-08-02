@@ -7,6 +7,9 @@
 
 import { mixcoreService, MixcoreError } from './mixcore';
 import type { ApiResult } from '@mixcore/shared';
+import { MixDbClient, createMixDbClient } from '$lib/javascript-sdk/packages/database/src/mix-db-client';
+import type { ListDatabasesParams, ListTablesParams } from '$lib/javascript-sdk/packages/database/src/mix-db-client';
+import { ApiService } from '$lib/javascript-sdk/packages/api/src/api-services';
 
 // Define basic query types locally
 export interface MixQuery {
@@ -118,120 +121,24 @@ export class DatabaseService {
     // Use the real mixcore service which has the actual SDK client
   }
 
-  private async createDatabaseService() {
-    // Dynamically import database services to avoid circular deps
-    const { MixDatabaseRestPortalService } = await import('$lib/javascript-sdk/packages/database/src/mix-database-rest-portal-service');
-    const { MixDatabaseDataRestPortalService } = await import('$lib/javascript-sdk/packages/database/src/mix-database-data-rest-portal-service');
-    const { ModuleDataService } = await import('$lib/javascript-sdk/packages/database/src/module-data-services');
-    const { ApiService } = await import('$lib/javascript-sdk/packages/api/src/api-services');
-    
-    const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
+  // Use a singleton MixDbClient for all DB operations
+  private mixDbClient: MixDbClient | null = null;
 
-    // Always provide apiKey and onRefreshToken for authenticated requests
-    const apiKey = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
-    const apiService = new ApiService({
-      apiBaseUrl,
-      apiKey,
-      onRefreshToken: async () => {
-        const refreshed = await mixcoreService.refreshAuthToken();
-        return refreshed ? (mixcoreService as any).accessToken : null;
-      }
-    });
-
-    // Create MixDbDatabase service for database listing
-    const mixDbDatabaseService = {
-      async getDatabases(params?: {
-        pageSize?: number;
-        status?: string;
-        sortBy?: string;
-        direction?: 'Asc' | 'Desc';
-        searchColumns?: string;
-        compareOperator?: string;
-        conjunction?: string;
-        columns?: string;
-        keyword?: string;
-        pageIndex?: number;
-      }): Promise<ApiResult> {
-        const queryParams = {
-          pageSize: 20,
-          status: 'Published',
-          sortBy: 'id',
-          direction: 'Desc',
-          searchColumns: 'displayName,systemName',
-          compareOperator: 'Like',
-          conjunction: 'Or',
-          columns: 'id,displayName,systemName,type,createdDatetime',
-          ...params
-        };
-        return apiService.get('/api/v2/rest/mix-portal/mix-db-database', queryParams);
-      },
-
-      async getDatabaseById(id: string): Promise<ApiResult> {
-        return apiService.get(`/api/v2/rest/mix-portal/mix-db-database/get-by/${id}`);
-      },
-
-      async createDatabase(data: any): Promise<ApiResult> {
-        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
-      },
-
-      async updateDatabase(data: any): Promise<ApiResult> {
-        return apiService.post('/api/v2/rest/mix-portal/mix-db-database/save', data);
-      },
-
-      async deleteDatabase(id: string): Promise<ApiResult> {
-        return apiService.delete(`/api/v2/rest/mix-portal/mix-db-database/delete/${id}`);
-      }
-    };
-
-    // Create MixDbTable service for table listing
-    const mixDbTableService = {
-      async getTables(mixDbDatabaseId: string | number, params?: {
-        pageSize?: number;
-        status?: string;
-        direction?: 'Asc' | 'Desc';
-        compareOperator?: string;
-        conjunction?: string;
-        keyword?: string;
-        pageIndex?: number;
-        sortBy?: string;
-      }): Promise<ApiResult> {
-        const queryParams = {
-          pageSize: 20,
-          status: 'Published',
-          direction: 'Desc',
-          compareOperator: 'Like',
-          conjunction: 'Or',
-          mixDbDatabaseId: mixDbDatabaseId.toString(),
-          ...params
-        };
-        return apiService.get('/api/v2/rest/mix-portal/mix-db-table', queryParams);
-      },
-
-      async getTableById(id: string): Promise<ApiResult> {
-        return apiService.get(`/api/v2/rest/mix-portal/mix-db-table/get-by/${id}`);
-      },
-
-      async createTable(data: any): Promise<ApiResult> {
-        return apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data);
-      },
-
-      async updateTable(data: any): Promise<ApiResult> {
-        return apiService.post('/api/v2/rest/mix-portal/mix-db-table/save', data);
-      },
-
-      async deleteTable(id: string): Promise<ApiResult> {
-        return apiService.delete(`/api/v2/rest/mix-portal/mix-db-table/delete/${id}`);
-      }
-    };
-
-    return {
-      databaseService: new MixDatabaseRestPortalService(apiService),
-      databaseDataService: new MixDatabaseDataRestPortalService(apiService),
-      moduleDataService: new ModuleDataService({ apiBaseUrl }),
-      mixDbDatabaseService,
-      mixDbTableService,
-      apiService
-    };
+  private getMixDbClient(): MixDbClient {
+    if (!this.mixDbClient) {
+      const apiBaseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
+      const apiKey = (mixcoreService as any).accessToken || localStorage.getItem('mixcore_access_token') || '';
+      const apiService = new ApiService({
+        apiBaseUrl,
+        apiKey,
+        onRefreshToken: async () => {
+          const refreshed = await mixcoreService.refreshAuthToken();
+          return refreshed ? (mixcoreService as any).accessToken : null;
+        }
+      });
+      this.mixDbClient = createMixDbClient(apiService);
+    }
+    return this.mixDbClient;
   }
 
   // Get database statistics
@@ -266,19 +173,10 @@ export class DatabaseService {
   // Get all tables
   async getTables(): Promise<TableInfo[]> {
     try {
-      const { mixDbDatabaseService } = await this.createDatabaseService();
-      
-      // First get the list of databases
-      const databasesResult = await mixDbDatabaseService.getDatabases({
-        pageSize: 100,
-        status: 'Published'
-      });
-      
-      if (databasesResult.isSucceed && databasesResult.data?.items) {
-        // Return databases as "tables" - this represents the database list view
-        return databasesResult.data.items.map((db: any) => this.transformMixDbDatabaseToTable(db));
+      const result = await this.getMixDbClient().listDatabases({ pageSize: 100, status: 'Published' });
+      if (result.isSucceed && result.data?.items) {
+        return result.data.items.map((db: any) => this.transformMixDbDatabaseToTable(db));
       }
-      
       // Fallback to mock data if SDK call fails
       console.warn('Using fallback database tables - SDK call failed or returned no data');
       return this.getFallbackTables();
@@ -295,18 +193,10 @@ export class DatabaseService {
   // Get tables for a specific database
   async getTablesForDatabase(databaseId: string | number): Promise<TableInfo[]> {
     try {
-      const { mixDbTableService } = await this.createDatabaseService();
-      
-      // Get tables for the specific database using the mix-db-table endpoint
-      const tablesResult = await mixDbTableService.getTables(databaseId, {
-        pageSize: 100,
-        status: 'Published'
-      });
-      
-      if (tablesResult.isSucceed && tablesResult.data?.items) {
-        return tablesResult.data.items.map((table: any) => this.transformMixDbTableToTable(table));
+      const result = await this.getMixDbClient().listTables(databaseId, { pageSize: 100, status: 'Published' });
+      if (result.isSucceed && result.data?.items) {
+        return result.data.items.map((table: any) => this.transformMixDbTableToTable(table));
       }
-      
       // Fallback to mock data
       console.warn(`No tables found for database ${databaseId}, using fallback`);
       return this.getFallbackTables();
@@ -550,8 +440,6 @@ export class DatabaseService {
   // Create new table/database
   async createTable(request: CreateTableRequest): Promise<TableInfo> {
     try {
-      const { mixDbDatabaseService } = await this.createDatabaseService();
-      
       // Try to create database using SDK
       const createData = {
         displayName: request.displayName,
@@ -562,13 +450,10 @@ export class DatabaseService {
         status: 'Published',
         description: request.description
       };
-      
-      const result = await mixDbDatabaseService.createDatabase(createData);
-      
+      const result = await this.getMixDbClient().createDatabase(createData);
       if (result.isSucceed && result.data) {
         return this.transformMixDbDatabaseToTable(result.data);
       }
-      
       // Fallback to mock creation
       const newTable: TableInfo = {
         id: request.name,
@@ -592,7 +477,6 @@ export class DatabaseService {
           relationships: []
         }
       };
-
       console.log('Creating table:', newTable);
       return newTable;
     } catch (error) {
@@ -628,15 +512,11 @@ export class DatabaseService {
   // Delete table/database
   async deleteTable(tableId: string): Promise<boolean> {
     try {
-      const { mixDbDatabaseService } = await this.createDatabaseService();
-      
       // Try to delete database using SDK
-      const result = await mixDbDatabaseService.deleteDatabase(tableId);
-      
+      const result = await this.getMixDbClient().deleteDatabase(tableId);
       if (result.isSucceed) {
         return true;
       }
-      
       // Fallback to mock deletion
       console.log(`Deleting table ${tableId}`);
       return true;
@@ -733,37 +613,16 @@ export class DatabaseService {
 
   // Migrate database
   async migrate(mixDatabaseId: string): Promise<boolean> {
-    try {
-      const { databaseService, databaseDataService } = await this.createDatabaseService();
-      
-      // Try database migration using SDK
-      const migrationResult = await databaseService.migrate({ id: mixDatabaseId });
-      
-      if (migrationResult.isSucceed) {
-        // Also migrate data if needed
-        await databaseDataService.migrate(mixDatabaseId);
-        return true;
-      }
-      
-      console.log(`Migrating database ${mixDatabaseId}`);
-      return true;
-    } catch (error) {
-      console.error('Failed to migrate database:', error);
-      return false;
-    }
+    // Not implemented: MixDbClient does not expose migration yet
+    console.warn('migrate() is not implemented with MixDbClient.');
+    return false;
   }
   
   // Initialize database data
   async initializeData(mixDatabaseName: string): Promise<boolean> {
-    try {
-      const { databaseDataService } = await this.createDatabaseService();
-      
-      const result = await databaseDataService.initData(mixDatabaseName);
-      return result.isSucceed;
-    } catch (error) {
-      console.error('Failed to initialize database data:', error);
-      return false;
-    }
+    // Not implemented: MixDbClient does not expose initializeData yet
+    console.warn('initializeData() is not implemented with MixDbClient.');
+    return false;
   }
 
   // Helper methods for SDK integration
