@@ -1,0 +1,97 @@
+name: mix.ai.studio
+description: Mixcore AI Studio - A comprehensive development platform for AI-powered applications
+version: 1.0.0
+language: typescript
+
+# Project type and framework information
+project_type: web_application
+frameworks:
+  - svelte
+  - sveltekit
+  - typescript
+  - tailwindcss
+  - daisyui
+
+# Technology stack
+stack:
+  frontend:
+    - svelte
+    - sveltekit
+    - typescript
+    - tailwindcss
+    - daisyui
+    - vite
+  backend:
+    - mixcore_api
+    - rest_api
+  database:
+    - mixdb
+    - sql_server
+  authentication:
+    - jwt
+    - refresh_tokens
+    - oauth
+
+# Key directories and their purposes
+directories:
+  src: "Main source code directory"
+  src/lib: "Shared library components and services"
+  src/lib/components: "Reusable Svelte components"
+  src/lib/services: "Business logic and API services"
+  src/lib/stores: "Svelte stores for state management"
+  src/lib/javascript-sdk: "Mixcore JavaScript SDK packages"
+  src/routes: "SvelteKit routes and pages"
+  static: "Static assets"
+
+# Important files
+key_files:
+  - package.json
+  - svelte.config.js
+  - vite.config.ts
+  - tailwind.config.js
+  - tsconfig.json
+  - AUTH.md
+  - README.md
+
+# Development context
+context:
+  purpose: "AI-powered development platform with database management, real-time chat, and code editing capabilities"
+  features:
+    - "Database management with MixDB integration"
+    - "Real-time chat with AI agents"
+    - "Code editor with VSCode-like functionality"
+    - "Authentication with token refresh"
+    - "Responsive design with device preview modes"
+    - "Project templates and scaffolding"
+  
+# Current focus areas
+current_work:
+  - "Authentication token refresh implementation"
+  - "Database service integration"
+  - "API error handling improvements"
+  - "Component development and UI/UX"
+
+# Coding standards and preferences
+coding_standards:
+  typescript: "Strict mode enabled"
+  formatting: "Prettier with 2-space indentation"
+  components: "Composition API pattern preferred"
+  state_management: "Svelte stores"
+  api_calls: "Service layer pattern with error handling"
+  authentication: "JWT with automatic refresh on 401 errors"
+
+# Environment variables
+env_vars:
+  VITE_MIXCORE_API_URL: "Mixcore API base URL"
+  
+# Documentation
+docs:
+  auth: "AUTH.md - Authentication and token refresh documentation"
+  example_usage: "example-auth-usage.svelte - Auth implementation examples"
+
+# Serena MCP Server Configuration
+serena:
+  mcp_server: true
+  dashboard_url: "http://127.0.0.1:24282/dashboard/index.html"
+  context: "ide-assistant"
+  status: "running"

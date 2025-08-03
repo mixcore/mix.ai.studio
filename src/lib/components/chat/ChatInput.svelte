@@ -23,9 +23,9 @@
   let errorMessage = "";
   let isUploading = false;
   
-  // Chat modes
-  type ChatMode = "default" | "chat-only" | "visual-editor";
-  let selectedMode: ChatMode = "default";
+  // Chat modes (commented out for now - might enable again in future)
+  // type ChatMode = "default" | "chat-only" | "visual-editor";
+  // let selectedMode: ChatMode = "default";
 
   // Constants
   const RATE_LIMIT_MS = 1000; // 1 second between messages
@@ -198,11 +198,11 @@
   }
 
   // Mode selection
-  function selectMode(mode: ChatMode) {
-    selectedMode = mode;
-    // TODO: Emit event or update store for mode change
-    console.log("Mode selected:", mode);
-  }
+  // function selectMode(mode: ChatMode) {
+  //   selectedMode = mode;
+  //   // TODO: Emit event or update store for mode change
+  //   console.log("Mode selected:", mode);
+  // }
 
   // Auto-resize functionality
   function autoResize() {
@@ -242,7 +242,8 @@
 </script>
 
 <div class="space-y-4">
-  <!-- Mode Toggle -->
+  <!-- Mode Toggle (commented out for now - might enable again in future) -->
+  <!--
   <div class="flex items-center gap-2 text-xs" role="tablist" aria-label="Chat mode selection">
     <button 
       class={cn(
@@ -286,6 +287,7 @@
       Visual editor
     </button>
   </div>
+  -->
 
   <!-- Error Message -->
   {#if errorMessage}

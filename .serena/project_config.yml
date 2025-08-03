@@ -1,0 +1,37 @@
+project_name: mix.ai.studio
+language: typescript
+description: Mixcore AI Studio - A comprehensive development platform for AI-powered applications
+
+project_type: web_application
+main_language: typescript
+
+frameworks:
+  - svelte
+  - sveltekit
+  - typescript
+  - tailwindcss
+  - daisyui
+
+context:
+  purpose: AI-powered development platform with database management, real-time chat, and code editing capabilities
+  current_work:
+    - Authentication token refresh implementation
+    - Database service integration
+    - API error handling improvements
+    - Component development and UI/UX
+
+directories:
+  src: Main source code directory
+  src/lib: Shared library components and services
+  src/lib/components: Reusable Svelte components
+  src/lib/services: Business logic and API services
+  src/lib/stores: Svelte stores for state management
+  src/routes: SvelteKit routes and pages
+
+coding_standards:
+  typescript: Strict mode enabled
+  formatting: Prettier with 2-space indentation
+  components: Composition API pattern preferred
+  state_management: Svelte stores
+  api_calls: Service layer pattern with error handling
+  authentication: JWT with automatic refresh on 401 errors

@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "qdrant": {
+      "disabled": false,
+      "timeout": 300,
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-qdrant"
+      ],
+      "env": {
+        "QDRANT_URL": "https://68550df5-b9ae-430a-be50-72f02e520db0.eu-west-1-0.aws.cloud.qdrant.io:6333",
+        "QDRANT_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.EJVNxvW19sZYzEub4lPb5VAxhqTBQkFm2qSOp21aP_A",
+        "COLLECTION_NAME": "brainiacminds-dev-agent-knowledge",
+        "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2"
+      }
+    },
+    "serena": {
+      "disabled": false,
+      "timeout": 300,
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant",
+        "--project",
+        "/Users/smilefounder/Desktop/mixcore/mix.ai.studio"
+      ],
+      "env": {}
+    }
+  }
+}
