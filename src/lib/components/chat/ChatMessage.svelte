@@ -47,7 +47,8 @@ import { Carta, Markdown } from 'carta-md';
 		"max-w-[80%] rounded-lg px-4 py-2",
 		message.role === 'user' 
 			? 'bg-primary text-primary-content' 
-			: 'bg-base-200'
+			: 'bg-base-200',
+		message.isStreaming && 'animate-pulse'
 	)}>
 		<div class="prose prose-sm max-w-none markdown-content">
 			<Markdown value={message.content} {carta} />
@@ -56,8 +57,17 @@ import { Carta, Markdown } from 'carta-md';
 			"flex items-center gap-2 mt-2 text-xs",
 			message.role === 'user' ? 'text-primary-content/70' : 'text-base-content/60'
 		)}>
-			<span>{formatTimestamp(message.timestamp)}</span>
-			{#if message.role === 'assistant'}
+			{#if message.isStreaming}
+				<span class="flex items-center gap-1">
+					<span class="w-1 h-1 bg-current rounded-full animate-bounce"></span>
+					<span class="w-1 h-1 bg-current rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+					<span class="w-1 h-1 bg-current rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+					<span class="ml-1">Streaming...</span>
+				</span>
+			{:else}
+				<span>{formatTimestamp(message.timestamp)}</span>
+			{/if}
+			{#if message.role === 'assistant' && !message.isStreaming}
 				<div class="flex items-center gap-1 ml-auto">
 					<button 
 						class="btn btn-ghost btn-xs"

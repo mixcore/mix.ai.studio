@@ -35,6 +35,7 @@ export interface ChatMessage {
 	attachments?: string[];
 	projectId?: string;
 	metadata?: Record<string, any>;
+	isStreaming?: boolean;
 }
 
 export interface Workspace {

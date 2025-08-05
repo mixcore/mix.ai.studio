@@ -5,6 +5,7 @@
     chatInput,
     chatLoading,
     chatMessages,
+    chatStreaming,
   } from "$lib/stores";
   import { cn } from "$lib/utils";
   import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
@@ -60,7 +61,7 @@
 
   // Message sending logic
   async function sendMessage() {
-    if (!chatService || $chatLoading) return;
+    if (!chatService || $chatLoading || $chatStreaming) return;
 
     const rawInput = $chatInput;
     const sanitizedInput = sanitizeInput(rawInput);
@@ -193,7 +194,7 @@
   }
 
   function handleImageUpload() {
-    if (!allowFileUpload || isUploading) return;
+    if (!allowFileUpload || isUploading || $chatStreaming) return;
     fileInput?.click();
   }
 
@@ -231,7 +232,7 @@
   // Character count and button state
   $: remainingChars = maxLength - $chatInput.length;
   $: isNearLimit = remainingChars < 100;
-  $: canSend = $chatInput.trim().length > 0 && !$chatLoading && !errorMessage;
+  $: canSend = $chatInput.trim().length > 0 && !$chatLoading && !$chatStreaming && !errorMessage;
 
   // Cleanup on destroy
   onDestroy(() => {
@@ -309,10 +310,10 @@
         "textarea textarea-bordered resize-none transition-colors",
         "focus:textarea-primary focus:outline-none",
         "placeholder:text-base-content/50",
-        $chatLoading && "cursor-not-allowed opacity-60",
+        ($chatLoading || $chatStreaming) && "cursor-not-allowed opacity-60",
         errorMessage && "textarea-error"
       )}
-      disabled={$chatLoading}
+      disabled={$chatLoading || $chatStreaming}
       aria-label="Chat message input"
       aria-describedby="char-count {errorMessage ? 'error-message' : ''}"
       on:keydown={handleKeyDown}
@@ -340,7 +341,7 @@
             "btn btn-ghost btn-sm transition-colors",
             isUploading && "loading"
           )}
-          disabled={$chatLoading || isUploading}
+          disabled={$chatLoading || $chatStreaming || isUploading}
           aria-label={isUploading ? "Uploading image..." : "Attach image"}
           title={isUploading ? "Uploading..." : "Attach image"}
           on:click={handleImageUpload}
@@ -358,7 +359,7 @@
         )}
         disabled={!canSend}
         aria-label="Send message"
-        title={canSend ? "Send message (Enter)" : "Type a message to send"}
+        title={canSend ? "Send message (Enter)" : $chatStreaming ? "AI is responding..." : "Type a message to send"}
         on:click={handleSubmit}
       >
         <Send class={cn("w-4 h-4 transition-transform", canSend && "scale-105")} aria-hidden="true" />

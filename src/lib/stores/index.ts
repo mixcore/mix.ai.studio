@@ -24,6 +24,11 @@ export const chatLoading = writable(false);
 export const chatMode = writable<'default' | 'chat-only' | 'agent'>('default');
 export const chatInput = writable('');
 
+// Streaming chat state
+export const chatStreaming = writable(false);
+export const chatStreamingMessage = writable('');
+export const chatStreamingMessageId = writable<string | null>(null);
+
 // LLM Integration
 export const llmProviders = writable<Record<string, LLMProvider>>({});
 export const selectedLLMProvider = writable<string>('openai');

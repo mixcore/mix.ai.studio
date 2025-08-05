@@ -25,7 +25,14 @@
       "Bash(git commit:*)",
       "Bash(echo $VITE_MIXCORE_PREVIEW_ENDPOINT)",
       "Bash(mv:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__replace_regex",
+      "mcp__serena__find_file",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__find_symbol",
+      "mcp__serena__replace_symbol_body",
+      "mcp__serena__insert_after_symbol"
     ],
     "deny": []
   }

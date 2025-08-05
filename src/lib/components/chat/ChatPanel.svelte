@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Bot } from "lucide-svelte";
-  import { chatMessages, chatLoading } from "$lib/stores";
+  import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId } from "$lib/stores";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
   import { onMount, onDestroy } from "svelte";
@@ -30,43 +30,64 @@
         }
       });
 
-      // Handle incoming messages
-      chatService.onMessageReceived((message: SignalRMessage) => {
-        if (message?.data?.response) {
-          // Turn off loading state immediately when response arrives
-          chatLoading.set(false);
-          
-          // Extract the actual content string from the response
-          let content = '';
-          if (typeof message.data.response === 'string') {
-            content = message.data.response;
-          } else if (typeof message.data.response === 'object' && message.data.response !== null) {
-            // Handle complex SignalR response structures
-            const responseObj = message.data.response as any;
-            if (responseObj.content) {
-              content = responseObj.content;
-            } else if (responseObj.data) {
-              content = responseObj.data;
-            } else if (responseObj.message) {
-              content = responseObj.message;
-            } else {
-              // Fallback - try to extract meaningful text from the object
-              content = JSON.stringify(message.data.response, null, 2);
-            }
-          } else {
-            content = String(message.data.response);
+      // Handle streaming messages
+      chatService.onStreaming((chunk: string, isComplete: boolean) => {
+        if (isComplete) {
+          // Streaming complete - add final message and reset streaming state
+          const finalMessage = $chatStreamingMessage;
+          if (finalMessage) {
+            chatMessages.update((messages) => [
+              ...messages,
+              {
+                id: $chatStreamingMessageId || Date.now().toString(),
+                content: finalMessage,
+                role: "assistant",
+                timestamp: new Date().toISOString(),
+              },
+            ]);
           }
           
-          chatMessages.update((messages) => [
-            ...messages,
-            {
-              id: Date.now().toString(),
-              content: content,
-              role: "assistant",
-              timestamp: new Date().toISOString(),
-            },
-          ]);
+          // Reset streaming state
+          chatStreaming.set(false);
+          chatStreamingMessage.set('');
+          chatStreamingMessageId.set(null);
+          chatLoading.set(false);
+        } else {
+          // Accumulate streaming chunk
+          if (!$chatStreaming) {
+            chatStreaming.set(true);
+            chatStreamingMessage.set('');
+            chatStreamingMessageId.set(crypto.randomUUID());
+            chatLoading.set(false); // Turn off loading when streaming starts
+          }
+          
+          chatStreamingMessage.update((current) => current + chunk);
         }
+      });
+
+      // Handle streaming state changes
+      chatService.onStreamingStateChange((state) => {
+        chatStreaming.set(state.isStreaming);
+        if (!state.isStreaming && state.currentMessage) {
+          // Ensure final message is captured
+          chatStreamingMessage.set(state.currentMessage);
+        }
+      });
+
+      // Handle regular messages emitted by ChatService
+      chatService.onRegularMessage((message) => {
+        console.log('Regular message from ChatService:', message);
+        chatLoading.set(false);
+        
+        chatMessages.update((messages) => [
+          ...messages,
+          message
+        ]);
+      });
+
+      // Raw SignalR messages are processed internally by ChatService
+      chatService.onMessageReceived((message: SignalRMessage) => {
+        console.log('Raw SignalR message received:', message);
       });
 
       await chatService.start();
@@ -81,14 +102,16 @@
     }
   });
 
-  // Optimized smooth scrolling - only when new messages are added
-  $: if (chatContainer && $chatMessages.length > previousMessageCount) {
-    previousMessageCount = $chatMessages.length;
+  // Optimized smooth scrolling - for new messages and streaming updates
+  $: if (chatContainer && ($chatMessages.length > previousMessageCount || $chatStreamingMessage)) {
+    if ($chatMessages.length > previousMessageCount) {
+      previousMessageCount = $chatMessages.length;
+    }
     // Use requestAnimationFrame for smoother scrolling
     requestAnimationFrame(() => {
       chatContainer.scrollTo({
         top: chatContainer.scrollHeight,
-        behavior: 'smooth'
+        behavior: $chatStreaming ? 'instant' : 'smooth'
       });
     });
   }
@@ -110,9 +133,21 @@
       {#each $chatMessages as message (message.id)}
         <ChatMessage {message} />
       {/each}
+      
+      {#if $chatStreaming && $chatStreamingMessage}
+        <ChatMessage 
+          message={{
+            id: $chatStreamingMessageId || 'streaming',
+            content: $chatStreamingMessage,
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+            isStreaming: true
+          }} 
+        />
+      {/if}
     {/if}
 
-    {#if $chatLoading}
+    {#if $chatLoading && !$chatStreaming}
       <div class="flex items-center gap-2 text-base-content/60">
         <div class="flex space-x-1">
           <div class="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
