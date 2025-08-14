@@ -397,10 +397,11 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
       let streamingMessageId = crypto.randomUUID();
       let streamingCompleted = false;
       
-      chatStreaming.set(true);
-      chatStreamingMessage.set('');
-      chatStreamingMessageId.set(streamingMessageId);
-      chatLoading.set(false); // Turn off loading when streaming starts
+  chatStreaming.set(true);
+  chatStreamingMessage.set('');
+  chatStreamingMessageId.set(streamingMessageId);
+  chatLoading.set(false); // Turn off loading when streaming starts
+  console.log('[DEBUG] Streaming started, messageId:', streamingMessageId);
 
       // Create system prompt with MCP context
       const mcpSystemPrompt = createMCPSystemPrompt($mcpTools);
@@ -417,18 +418,28 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
         useMCPTools: true,  // Enable MCP tools for external LLMs
         stream: true,       // Enable streaming for external LLMs
         onChunk: (chunk: string, isComplete: boolean) => {
-          if (isComplete) {
+          if (!chatStreaming) {
+            chatStreaming.set(true);
+            console.log('[DEBUG] chatStreaming set to true on first chunk');
+          }
+          if (!isComplete) {
+            // Accumulate streaming chunk and display in real-time
+            console.log('[DEBUG] Streaming chunk received:', chunk);
+            chatStreamingMessage.update((current: string) => {
+              const updated = current + chunk;
+              console.log('[DEBUG] chatStreamingMessage updated:', updated);
+              return updated;
+            });
+          } else {
             // Streaming complete - add final message and reset streaming state
             const finalMessage = $chatStreamingMessage;
-            
+            console.log('[DEBUG] Streaming complete. Final message:', finalMessage);
             if (finalMessage && !streamingCompleted) {
               streamingCompleted = true;
-              
               // Check if response contains template operations and trigger refresh
               if (detectTemplateOperations(finalMessage)) {
                 triggerPreviewRefresh();
               }
-              
               chatMessages.update(messages => [
                 ...messages,
                 {
@@ -439,14 +450,11 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
                 }
               ]);
             }
-            
             // Reset streaming state
             chatStreaming.set(false);
             chatStreamingMessage.set('');
             chatStreamingMessageId.set(null);
-          } else {
-            // Accumulate streaming chunk and display in real-time
-            chatStreamingMessage.update((current: string) => current + chunk);
+            console.log('[DEBUG] Streaming state reset.');
           }
         }
       });

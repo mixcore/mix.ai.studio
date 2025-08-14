@@ -50,9 +50,16 @@ import { Carta, Markdown } from 'carta-md';
 			: 'bg-base-200',
 		message.isStreaming && 'animate-pulse'
 	)}>
-		<div class="prose prose-sm max-w-none markdown-content">
-			<Markdown value={message.content} {carta} />
-		</div>
+		   <div class="prose prose-sm max-w-none markdown-content">
+			   {#key message.content.length}
+				   <Markdown value={message.content} {carta} />
+			   {/key}
+		   </div>
+		   <!-- {#if message.isStreaming}
+			   <div class="text-xs text-warning mt-1">
+				   [DEBUG] Streaming raw: {message.content}
+			   </div>
+		   {/if} -->
 		<div class={cn(
 			"flex items-center gap-2 mt-2 text-xs",
 			message.role === 'user' ? 'text-primary-content/70' : 'text-base-content/60'
