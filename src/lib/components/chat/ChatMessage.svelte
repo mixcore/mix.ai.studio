@@ -33,6 +33,95 @@ import { Carta, Markdown } from 'carta-md';
 	}
 </script>
 
+<style>
+.markdown-content ul, .markdown-content ol {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+.markdown-content li {
+  margin-bottom: 0.25em;
+}
+.markdown-content code {
+  background: #23272f;
+  color: #facc15;
+  border-radius: 0.3em;
+  padding: 0.15em 0.4em;
+  font-size: 0.98em;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', 'monospace';
+}
+.markdown-content pre {
+  background: #23272f;
+  color: #f1f5f9;
+  border-radius: 0.5em;
+  padding: 1em 1.2em;
+  margin: 1.2em 0;
+  font-size: 0.98em;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', 'monospace';
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+}
+.markdown-content pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+}
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+.markdown-content a:hover {
+  color: #1e40af;
+}
+.markdown-content blockquote {
+  border-left: 4px solid #818cf8;
+  background: #f1f5f9;
+  color: #334155;
+  margin: 1em 0;
+  padding: 0.7em 1em;
+  border-radius: 0.5em;
+  font-style: italic;
+}
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+.markdown-content th, .markdown-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5em 0.8em;
+}
+.markdown-content th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 2em 0;
+}
+.markdown-content {
+  /* ...existing code... */
+}
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content pre,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content hr {
+  margin-top: 1.1em;
+  margin-bottom: 1.1em;
+}
+.markdown-content > *:first-child {
+  margin-top: 0;
+}
+.markdown-content > *:last-child {
+  margin-bottom: 0;
+}
+</style>
+
 <div class={cn(
 	"flex gap-3",
 	message.role === 'user' ? 'justify-end' : 'justify-start'
