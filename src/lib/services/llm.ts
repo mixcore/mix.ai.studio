@@ -834,27 +834,39 @@ export class LLMService {
 
     // Handle non-streaming response
     const data = await response.json();
+    console.log('🔧 Claude API response data:', JSON.stringify(data, null, 2));
     
     // Extract text content and tool calls
     let content = '';
     const toolCalls: any[] = [];
     
     if (data.content && Array.isArray(data.content)) {
+      console.log(`🔧 Claude response content blocks: ${data.content.length}`);
       for (const contentBlock of data.content) {
+        console.log('🔧 Processing content block:', contentBlock);
         if (contentBlock.type === 'text') {
           content += contentBlock.text;
+          console.log('🔧 Added text content:', contentBlock.text.substring(0, 100) + '...');
         } else if (contentBlock.type === 'tool_use') {
-          toolCalls.push({
+          const toolCall = {
             id: contentBlock.id,
             type: 'function',
             function: {
               name: contentBlock.name,
               arguments: JSON.stringify(contentBlock.input)
             }
-          });
+          };
+          toolCalls.push(toolCall);
+          console.log('🔧 Added tool call:', toolCall);
         }
       }
     }
+    
+    console.log('🔧 Claude response parsed:', {
+      content: content.substring(0, 200) + '...',
+      toolCallsCount: toolCalls.length,
+      toolCalls: toolCalls.map(tc => tc.function.name)
+    });
     
     return {
       content,
