@@ -3,7 +3,7 @@ import type { Workspace } from '$lib/types';
 import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/services/mixcore';
 // Re-export for external access
 export { mixcoreService };
-import { createLLMService, type LLMProvider } from '$lib/services/llm';
+import { createLLMService, LLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
 // Initialize services
 // Note: The real SDK client is now handled through mixcoreService

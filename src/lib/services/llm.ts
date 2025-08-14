@@ -18,6 +18,11 @@ export interface LLMMessage {
   content: string;
   metadata?: Record<string, any>;
   toolCallId?: string;
+  claudeToolResults?: Array<{
+    type: 'tool_result';
+    tool_use_id: string;
+    content: string;
+  }>;
   toolCalls?: Array<{
     id: string;
     type: 'function';
@@ -137,12 +142,56 @@ const DEFAULT_CONFIG: LLMConfig = {
 export class LLMService {
   private config: LLMConfig;
   private mcpClients: Map<string, any> = new Map();
+  private templateOperationCallbacks: Array<(toolName: string, args: Record<string, unknown>, result: any) => void> = [];
 
   constructor(config: Partial<LLMConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.initializeMCPConnections();
   }
 
+  // Check if a tool is a template operation
+  private isTemplateOperation(toolName: string): boolean {
+    const templateOperations = [
+      'CreateTemplate',
+      'UpdateTemplate',
+      'CreatePageContent',
+      'UpdatePageContent',
+      'CreateModuleContent',
+      'UpdateModuleContent',
+      'CreatePostContent',
+      'UpdatePostContent',
+      'DeleteTemplate',
+      'ListTemplates'
+    ];
+    return templateOperations.includes(toolName);
+  }
+
+  // Notify about template operations
+  private notifyTemplateOperation(toolName: string, args: Record<string, unknown>, result: any): void {
+    console.log(`🔧 Template operation executed: ${toolName}`, { args, result });
+    
+    // Call all registered callbacks
+    for (const callback of this.templateOperationCallbacks) {
+      try {
+        callback(toolName, args, result);
+      } catch (error) {
+        console.error('Error in template operation callback:', error);
+      }
+    }
+  }
+
+  // Register callback for template operations
+  onTemplateOperation(callback: (toolName: string, args: Record<string, unknown>, result: any) => void): () => void {
+    this.templateOperationCallbacks.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.templateOperationCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.templateOperationCallbacks.splice(index, 1);
+      }
+    };
+  }
 
   // Initialize MCP connections
   private async initializeMCPConnections() {
@@ -306,6 +355,7 @@ export class LLMService {
       temperature?: number;
       stream?: boolean;
       useMCPTools?: boolean;
+      onChunk?: (chunk: string, isComplete: boolean) => void;
     } = {}
   ): Promise<LLMResponse> {
     const provider = options.provider || this.config.defaultProvider;
@@ -351,15 +401,28 @@ export class LLMService {
 
   // Execute MCP tool call
   async executeMCPTool(toolName: string, args: Record<string, unknown>): Promise<string> {
+    console.log(`🔧 Executing MCP tool: ${toolName}`, { args });
+    
     const allTools = mcpService.getAllTools();
+    console.log(`🔧 Available MCP tools:`, allTools.map(t => t.tool.name));
+    
     const toolInfo = allTools.find(({ tool }) => tool.name === toolName);
     
     if (!toolInfo) {
+      console.error(`❌ Tool ${toolName} not found in available tools:`, allTools.map(t => t.tool.name));
       throw new Error(`Tool ${toolName} not found`);
     }
 
     try {
+      console.log(`🔧 Calling tool ${toolName} on server ${toolInfo.serverId}`);
       const result = await mcpService.callTool(toolInfo.serverId, toolName, args);
+      console.log(`✅ Tool ${toolName} executed successfully:`, result);
+      
+      // Check if this is a template operation and notify
+      if (this.isTemplateOperation(toolName)) {
+        console.log(`🎯 Template operation detected: ${toolName}`);
+        this.notifyTemplateOperation(toolName, args, result);
+      }
       
       // Format result for LLM
       if (result.content) {
@@ -372,6 +435,7 @@ export class LLMService {
       
       return 'Tool executed successfully';
     } catch (error) {
+      console.error(`❌ Failed to execute tool ${toolName}:`, error);
       throw new Error(`Failed to execute tool ${toolName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -382,9 +446,18 @@ export class LLMService {
     response: LLMResponse,
     options: any = {}
   ): Promise<{ messages: LLMMessage[]; finalResponse?: LLMResponse }> {
+    console.log('🔧 processToolCalls called', { 
+      toolCalls: response.toolCalls, 
+      messagesLength: messages.length,
+      provider: options.provider 
+    });
+    
     if (!response.toolCalls || response.toolCalls.length === 0) {
+      console.log('🔧 No tool calls to process');
       return { messages };
     }
+    
+    console.log(`🔧 Processing ${response.toolCalls.length} tool calls:`, response.toolCalls.map(tc => tc.function.name));
 
     // Add assistant message with tool calls
     const updatedMessages = [...messages, {
@@ -393,30 +466,101 @@ export class LLMService {
       toolCalls: response.toolCalls
     }];
 
+    // For Claude, we need to collect all tool results and send them as a single user message
+    const isClaudeProvider = options.provider === 'claude';
+    const toolResults: any[] = [];
+
+    console.log(`🔧 Starting tool execution for ${response.toolCalls.length} tools...`);
+
     // Execute each tool call
-    for (const toolCall of response.toolCalls) {
+    for (let i = 0; i < response.toolCalls.length; i++) {
+      const toolCall = response.toolCalls[i];
+      console.log(`🔧 Executing tool ${i + 1}/${response.toolCalls.length}: ${toolCall.function.name}`);
+      
       try {
         const args = JSON.parse(toolCall.function.arguments);
-        const result = await this.executeMCPTool(toolCall.function.name, args);
+        console.log(`🔧 Tool arguments:`, args);
         
-        // Add tool result message
-        updatedMessages.push({
-          role: 'tool' as const,
-          content: result,
-          toolCallId: toolCall.id
-        });
+        const result = await this.executeMCPTool(toolCall.function.name, args);
+        console.log(`✅ Tool ${toolCall.function.name} executed successfully:`, result);
+        
+        if (isClaudeProvider) {
+          // Collect tool results for Claude
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolCall.id,
+            content: result
+          });
+        } else {
+          // Add tool result message for OpenAI/other providers
+          updatedMessages.push({
+            role: 'tool' as const,
+            content: result,
+            toolCallId: toolCall.id
+          });
+        }
       } catch (error) {
-        // Add error result
-        updatedMessages.push({
-          role: 'tool' as const,
-          content: `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          toolCallId: toolCall.id
-        });
+        const errorMessage = `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error(`❌ Tool ${toolCall.function.name} failed:`, error);
+        
+        if (isClaudeProvider) {
+          // Add error result for Claude
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolCall.id,
+            content: errorMessage
+          });
+        } else {
+          // Add error result for OpenAI/other providers
+          updatedMessages.push({
+            role: 'tool' as const,
+            content: errorMessage,
+            toolCallId: toolCall.id
+          });
+        }
       }
     }
 
+    console.log(`🔧 All tools executed. Results collected:`, toolResults.length);
+
+    // For Claude, add all tool results as a single user message
+    if (isClaudeProvider && toolResults.length > 0) {
+      console.log('🔧 Adding Claude tool results to conversation:', toolResults);
+      updatedMessages.push({
+        role: 'user' as const,
+        content: '',
+        claudeToolResults: toolResults // Special field for Claude tool results
+      });
+    }
+
+    console.log('🔧 Sending updated conversation back to LLM with tool results...');
+    console.log('🔧 Updated messages count:', updatedMessages.length);
+    console.log('🔧 Last message:', updatedMessages[updatedMessages.length - 1]);
+
     // Send updated conversation back to LLM for final response
-    const finalResponse = await this.sendMessage(updatedMessages, options);
+    const finalResponse = await this.sendMessage(updatedMessages, {
+      ...options,
+      useMCPTools: true // Ensure MCP tools are still available for follow-up calls
+    });
+    
+    console.log('✅ Final response received:', {
+      content: finalResponse.content?.substring(0, 200) + '...',
+      hasToolCalls: !!finalResponse.toolCalls,
+      toolCallsCount: finalResponse.toolCalls?.length || 0
+    });
+
+    // Check if the final response contains additional tool calls
+    if (finalResponse.toolCalls && finalResponse.toolCalls.length > 0) {
+      console.log('🔧 Final response contains more tool calls, processing recursively...');
+      return this.processToolCalls(
+        [...updatedMessages, {
+          role: 'assistant' as const,
+          content: finalResponse.content
+        }],
+        finalResponse,
+        options
+      );
+    }
     
     return { 
       messages: [...updatedMessages, {
@@ -570,17 +714,94 @@ export class LLMService {
   private async sendToClaude(messages: LLMMessage[], model: string, options: any): Promise<LLMResponse> {
     const provider = this.config.providers.claude;
     
-    const requestBody = {
+    // Convert MCP tools to Claude format
+    const tools = options.tools?.map((tool: Tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema
+    })) || [];
+    
+    // Convert messages to Claude format (Claude doesn't support "tool" role)
+    const claudeMessages: any[] = [];
+    const nonSystemMessages = messages.filter(m => m.role !== 'system');
+    
+    for (let i = 0; i < nonSystemMessages.length; i++) {
+      const m = nonSystemMessages[i] as any;
+      
+      if (m.role === 'tool') {
+        // Tool result - need to find the previous assistant message and combine
+        const prevMessage = claudeMessages[claudeMessages.length - 1];
+        if (prevMessage && prevMessage.role === 'assistant') {
+          // Add tool result to previous assistant message
+          if (!Array.isArray(prevMessage.content)) {
+            prevMessage.content = [{ type: 'text', text: prevMessage.content }];
+          }
+          prevMessage.content.push({
+            type: 'tool_result',
+            tool_use_id: m.toolCallId,
+            content: m.content
+          });
+        } else {
+          // If no previous assistant message, create a user message with tool result
+          claudeMessages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: m.toolCallId,
+              content: m.content
+            }]
+          });
+        }
+      } else if (m.claudeToolResults) {
+        // Special Claude tool results - create user message with tool results
+        claudeMessages.push({
+          role: 'user',
+          content: m.claudeToolResults
+        });
+      } else if (m.toolCalls) {
+        // Assistant message with tool calls
+        const content = [];
+        if (m.content) {
+          content.push({ type: 'text', text: m.content });
+        }
+        for (const toolCall of m.toolCalls) {
+          content.push({
+            type: 'tool_use',
+            id: toolCall.id,
+            name: toolCall.function.name,
+            input: JSON.parse(toolCall.function.arguments)
+          });
+        }
+        claudeMessages.push({
+          role: m.role,
+          content: content
+        });
+      } else {
+        // Regular text message
+        claudeMessages.push({
+          role: m.role,
+          content: m.content
+        });
+      }
+    }
+
+    const requestBody: any = {
       model,
-      messages: messages.filter(m => m.role !== 'system').map(m => ({ 
-        role: m.role, 
-        content: m.content 
-      })),
+      messages: claudeMessages,
       system: messages.find(m => m.role === 'system')?.content,
       max_tokens: options.maxTokens || this.config.maxTokens,
       temperature: options.temperature || this.config.temperature,
       stream: options.stream || false
     };
+    
+    // Add tools if available
+    if (tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = { type: "auto" };
+      console.log(`🔧 Claude: Sending ${tools.length} tools:`, tools.map(t => t.name));
+    }
+    
+    console.log('🔧 Claude request body:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(`${provider.baseUrl}/messages`, {
       method: 'POST',
@@ -614,10 +835,32 @@ export class LLMService {
     // Handle non-streaming response
     const data = await response.json();
     
+    // Extract text content and tool calls
+    let content = '';
+    const toolCalls: any[] = [];
+    
+    if (data.content && Array.isArray(data.content)) {
+      for (const contentBlock of data.content) {
+        if (contentBlock.type === 'text') {
+          content += contentBlock.text;
+        } else if (contentBlock.type === 'tool_use') {
+          toolCalls.push({
+            id: contentBlock.id,
+            type: 'function',
+            function: {
+              name: contentBlock.name,
+              arguments: JSON.stringify(contentBlock.input)
+            }
+          });
+        }
+      }
+    }
+    
     return {
-      content: data.content[0].text,
+      content,
       model: data.model,
-      usage: data.usage
+      usage: data.usage,
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined
     };
   }
 
@@ -627,6 +870,8 @@ export class LLMService {
     const decoder = new TextDecoder();
     let content = '';
     let usage: any = null;
+    const toolCalls: any[] = [];
+    let currentToolCall: any = null;
 
     try {
       while (true) {
@@ -652,6 +897,23 @@ export class LLMService {
                 if (options.onChunk) {
                   options.onChunk(parsed.delta.text, false);
                 }
+              } else if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+                // Start of a tool use block
+                currentToolCall = {
+                  id: parsed.content_block.id,
+                  type: 'function',
+                  function: {
+                    name: parsed.content_block.name,
+                    arguments: ''
+                  }
+                };
+              } else if (parsed.type === 'content_block_delta' && parsed.delta?.partial_json && currentToolCall) {
+                // Accumulate tool arguments
+                currentToolCall.function.arguments += parsed.delta.partial_json;
+              } else if (parsed.type === 'content_block_stop' && currentToolCall) {
+                // End of tool use block
+                toolCalls.push(currentToolCall);
+                currentToolCall = null;
               } else if (parsed.type === 'message_stop') {
                 if (options.onChunk) {
                   options.onChunk('', true); // Signal completion
@@ -672,7 +934,8 @@ export class LLMService {
     return {
       content,
       model,
-      usage
+      usage,
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined
     };
   }
 

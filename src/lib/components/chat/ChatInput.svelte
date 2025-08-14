@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Send, Image, AlertCircle } from "lucide-svelte";
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     chatInput,
     chatLoading,
@@ -36,6 +36,7 @@
   let lastMessageTime = 0;
   let errorMessage = "";
   let isUploading = false;
+  let templateOperationUnsubscribe: (() => void) | null = null;
   
   // Chat modes (commented out for now - might enable again in future)
   // type ChatMode = "default" | "chat-only" | "visual-editor";
@@ -45,6 +46,17 @@
   const RATE_LIMIT_MS = 1000; // 1 second between messages
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+  // Setup template operation detection for MCP tool execution
+  onMount(() => {
+    console.log('🔧 Setting up MCP template operation callback');
+    // Register callback for template operations executed via MCP tools
+    templateOperationUnsubscribe = llmService.onTemplateOperation((toolName: string, args: Record<string, unknown>, result: any) => {
+      console.log('🎯 MCP Template operation callback triggered:', { toolName, args, result });
+      triggerPreviewRefresh();
+    });
+    console.log('🔧 MCP template operation callback registered');
+  });
 
   // Input validation and sanitization
   function sanitizeInput(input: string): string {
@@ -126,7 +138,9 @@
       // Handle different modes
       if (currentMode === 'mixcore') {
         // Use Mixcore streaming service
-        await chatService.sendMessage(sanitizedInput);
+        if (chatService) {
+          await chatService.sendMessage(sanitizedInput);
+        }
       } else {
         // Use external LLM service
         await sendExternalLLMMessage(sanitizedInput);
@@ -418,7 +432,7 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
         useMCPTools: true,  // Enable MCP tools for external LLMs
         stream: true,       // Enable streaming for external LLMs
         onChunk: (chunk: string, isComplete: boolean) => {
-          if (!chatStreaming) {
+          if (!$chatStreaming) {
             chatStreaming.set(true);
             console.log('[DEBUG] chatStreaming set to true on first chunk');
           }
@@ -458,6 +472,49 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
           }
         }
       });
+
+      // Process tool calls if the response contains any
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        console.log('🔧 Processing tool calls:', response.toolCalls);
+        
+        try {
+          const toolResult = await llmService.processToolCalls(messages, response, {
+            provider: providerKey,
+            model: $selectedModel.id,
+            useMCPTools: true
+          });
+          
+          // Add the final response after tool execution
+          if (toolResult.finalResponse?.content) {
+            // Check if response contains template operations and trigger refresh
+            if (detectTemplateOperations(toolResult.finalResponse.content)) {
+              triggerPreviewRefresh();
+            }
+            
+            chatMessages.update(messages => [
+              ...messages,
+              {
+                id: crypto.randomUUID(),
+                content: toolResult.finalResponse.content,
+                role: "assistant",
+                timestamp: new Date().toISOString(),
+              }
+            ]);
+          }
+        } catch (toolError) {
+          console.error('Failed to process tool calls:', toolError);
+          // Add error message to chat
+          chatMessages.update(messages => [
+            ...messages,
+            {
+              id: crypto.randomUUID(),
+              content: `Error executing tools: ${toolError instanceof Error ? toolError.message : 'Unknown error'}`,
+              role: "assistant",
+              timestamp: new Date().toISOString(),
+            }
+          ]);
+        }
+      }
 
       // Fallback for non-streaming response (only if streaming didn't complete)
       if (response.content && !streamingCompleted && !$chatStreaming) {
@@ -630,6 +687,11 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
   onDestroy(() => {
     if (resizeTimeout) {
       clearTimeout(resizeTimeout);
+    }
+    
+    // Cleanup template operation subscription
+    if (templateOperationUnsubscribe) {
+      templateOperationUnsubscribe();
     }
   });
 </script>
