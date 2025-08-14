@@ -177,14 +177,6 @@
     }
   });
 
-  // Debug streaming state
-  $: if ($chatStreaming || $chatStreamingMessage) {
-    console.log('📺 ChatPanel - Streaming state:', {
-      chatStreaming: $chatStreaming,
-      streamingMessageLength: $chatStreamingMessage.length,
-      streamingMessageId: $chatStreamingMessageId
-    });
-  }
 
   // Optimized smooth scrolling - for new messages and streaming updates
   $: if (chatContainer && ($chatMessages.length > previousMessageCount || $chatStreamingMessage)) {
@@ -305,11 +297,11 @@
         <ChatMessage {message} />
       {/each}
       
-      {#if $chatStreaming && $chatStreamingMessage}
+      {#if $chatStreaming}
         <ChatMessage 
           message={{
             id: $chatStreamingMessageId || 'streaming',
-            content: $chatStreamingMessage,
+            content: $chatStreamingMessage || '',
             role: 'assistant',
             timestamp: new Date().toISOString(),
             isStreaming: true

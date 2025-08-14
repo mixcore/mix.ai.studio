@@ -346,7 +346,16 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
     ];
     
     const content = responseContent.toLowerCase();
-    return templateOperations.some(op => content.includes(op.toLowerCase()));
+    const hasTemplateOp = templateOperations.some(op => content.includes(op.toLowerCase()));
+    
+    if (hasTemplateOp) {
+      console.log('🔍 Template operation detected in response:', {
+        responseLength: responseContent.length,
+        detectedOperations: templateOperations.filter(op => content.includes(op.toLowerCase()))
+      });
+    }
+    
+    return hasTemplateOp;
   }
 
   // Trigger iframe refresh
@@ -408,17 +417,9 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
         useMCPTools: true,  // Enable MCP tools for external LLMs
         stream: true,       // Enable streaming for external LLMs
         onChunk: (chunk: string, isComplete: boolean) => {
-          console.log('🔄 Streaming chunk received:', { 
-            chunkLength: chunk.length, 
-            isComplete, 
-            streamingState: $chatStreaming,
-            currentMessageLength: $chatStreamingMessage.length 
-          });
-          
           if (isComplete) {
             // Streaming complete - add final message and reset streaming state
             const finalMessage = $chatStreamingMessage;
-            console.log('✅ Streaming complete. Final message length:', finalMessage.length);
             
             if (finalMessage && !streamingCompleted) {
               streamingCompleted = true;
@@ -445,11 +446,7 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
             chatStreamingMessageId.set(null);
           } else {
             // Accumulate streaming chunk and display in real-time
-            chatStreamingMessage.update((current: string) => {
-              const newContent = current + chunk;
-              console.log('📝 Updated streaming message length:', newContent.length);
-              return newContent;
-            });
+            chatStreamingMessage.update((current: string) => current + chunk);
           }
         }
       });
