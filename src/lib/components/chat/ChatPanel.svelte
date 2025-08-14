@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Bot, Settings } from "lucide-svelte";
-  import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId, llmMode, selectedModel, llmService, availableModels } from "$lib/stores";
+  import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId, llmMode, selectedModel, llmService, availableModels, templateUpdateTrigger, shouldRefreshPreview } from "$lib/stores";
   import { mcpTools, mcpConnections } from "$lib/stores/mcp";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
@@ -16,6 +16,43 @@
   // Mode selection logic
   let currentMode: 'mixcore' | 'external' = 'mixcore';
   $: currentMode = $llmMode;
+
+  // Template operation detection function
+  function detectTemplateOperations(responseContent: string): boolean {
+    const templateOperations = [
+      'CreateTemplate',
+      'UpdateTemplate', 
+      'CreatePageContent',
+      'UpdatePageContent',
+      'CreateModuleContent',
+      'UpdateModuleContent',
+      'CreatePostContent',
+      'UpdatePostContent',
+      'template created',
+      'template updated',
+      'page created',
+      'page updated',
+      'module created',
+      'module updated',
+      'content created',
+      'content updated'
+    ];
+    
+    const content = responseContent.toLowerCase();
+    return templateOperations.some(op => content.includes(op.toLowerCase()));
+  }
+
+  // Trigger iframe refresh
+  function triggerPreviewRefresh() {
+    console.log('🔄 Template operation detected, triggering preview refresh');
+    templateUpdateTrigger.update((n: number) => n + 1);
+    shouldRefreshPreview.set(true);
+    
+    // Auto-clear the refresh flag after a short delay
+    setTimeout(() => {
+      shouldRefreshPreview.set(false);
+    }, 2000);
+  }
 
   // Initialize services based on current mode
   async function initializeServices() {
@@ -43,6 +80,11 @@
           // Streaming complete - add final message and reset streaming state
           const finalMessage = $chatStreamingMessage;
           if (finalMessage) {
+            // Check if response contains template operations and trigger refresh
+            if (detectTemplateOperations(finalMessage)) {
+              triggerPreviewRefresh();
+            }
+            
             chatMessages.update((messages) => [
               ...messages,
               {
@@ -85,6 +127,11 @@
       chatService.onRegularMessage((message) => {
         console.log('Regular message from ChatService:', message);
         chatLoading.set(false);
+        
+        // Check if message contains template operations and trigger refresh
+        if (message.content && detectTemplateOperations(message.content)) {
+          triggerPreviewRefresh();
+        }
         
         chatMessages.update((messages) => [
           ...messages,
@@ -202,10 +249,10 @@
             <div tabindex="0" role="button" class="btn btn-xs btn-ghost text-xs text-base-content/60 hover:text-base-content">
               View Tools
             </div>
-            <div tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-80 p-2 shadow-lg max-h-60 overflow-y-auto">
+            <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-80 p-2 shadow-lg max-h-60 overflow-y-auto">
               <div class="text-xs font-medium text-base-content/80 mb-2">Available MCP Tools ({$mcpTools.length}):</div>
               <div class="grid grid-cols-2 gap-1">
-                {#each $mcpTools as { serverName, tool }}
+                {#each $mcpTools as { tool }}
                   <div class="tooltip tooltip-top" data-tip={tool.description}>
                     <div class="badge badge-xs badge-outline text-xs p-2 cursor-help">
                       {tool.name}
@@ -217,7 +264,7 @@
               <div class="text-xs text-base-content/60">
                 Connected servers: {[...new Set($mcpTools.map(t => t.serverName))].join(', ')}
               </div>
-            </div>
+            </ul>
           </div>
         {/if}
       </div>

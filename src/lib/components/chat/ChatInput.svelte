@@ -9,7 +9,9 @@
     chatStreamingMessage,
     chatStreamingMessageId,
     selectedModel,
-    llmService
+    llmService,
+    templateUpdateTrigger,
+    shouldRefreshPreview
   } from "$lib/stores";
   import { mcpTools } from "$lib/stores/mcp";
   import { cn } from "$lib/utils";
@@ -310,6 +312,7 @@ ${toolDescriptions}
 4. **Document all MCP tool usage** and effectiveness in project files
 5. **Implement proper error handling** and user feedback mechanisms
 6. **Optimize for performance** with efficient queries and caching
+7. **Auto Preview Refresh**: Template operations automatically refresh the preview iframe
 
 ### Communication Style
 - **Strategic Insights**: Explain architectural decisions and trade-offs
@@ -319,6 +322,43 @@ ${toolDescriptions}
 - **Team Enablement**: Share knowledge and best practices
 
 You combine the strategic thinking of a CTO with the technical mastery of a senior architect, always delivering enterprise-grade solutions that scale and perform at the highest level.`;
+  }
+
+  // Detect template operations in responses and trigger iframe refresh
+  function detectTemplateOperations(responseContent: string): boolean {
+    const templateOperations = [
+      'CreateTemplate',
+      'UpdateTemplate', 
+      'CreatePageContent',
+      'UpdatePageContent',
+      'CreateModuleContent',
+      'UpdateModuleContent',
+      'CreatePostContent',
+      'UpdatePostContent',
+      'template created',
+      'template updated',
+      'page created',
+      'page updated',
+      'module created',
+      'module updated',
+      'content created',
+      'content updated'
+    ];
+    
+    const content = responseContent.toLowerCase();
+    return templateOperations.some(op => content.includes(op.toLowerCase()));
+  }
+
+  // Trigger iframe refresh
+  function triggerPreviewRefresh() {
+    console.log('🔄 Template operation detected, triggering preview refresh');
+    templateUpdateTrigger.update((n: number) => n + 1);
+    shouldRefreshPreview.set(true);
+    
+    // Auto-clear the refresh flag after a short delay
+    setTimeout(() => {
+      shouldRefreshPreview.set(false);
+    }, 2000);
   }
 
   // Handle external LLM message sending
@@ -374,6 +414,12 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
             
             if (finalMessage && !streamingCompleted) {
               streamingCompleted = true;
+              
+              // Check if response contains template operations and trigger refresh
+              if (detectTemplateOperations(finalMessage)) {
+                triggerPreviewRefresh();
+              }
+              
               chatMessages.update(messages => [
                 ...messages,
                 {
@@ -398,6 +444,11 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
 
       // Fallback for non-streaming response (only if streaming didn't complete)
       if (response.content && !streamingCompleted && !$chatStreaming) {
+        // Check if response contains template operations and trigger refresh
+        if (detectTemplateOperations(response.content)) {
+          triggerPreviewRefresh();
+        }
+        
         chatMessages.update(messages => [
           ...messages,
           {

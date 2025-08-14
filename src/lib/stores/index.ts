@@ -70,6 +70,10 @@ export const previewLoading = writable(false);
 export const showCodeView = writable(false);
 export const viewMode = writable<'preview' | 'database' | 'agent' | 'vscode'>('preview');
 
+// Template update tracking for iframe refresh
+export const templateUpdateTrigger = writable(0);
+export const shouldRefreshPreview = writable(false);
+
 export const showSettingsModal = writable(false);
 export const showInviteModal = writable(false);
 export const showPublishModal = writable(false);
