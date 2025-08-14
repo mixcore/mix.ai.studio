@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Bot } from "lucide-svelte";
-  import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId } from "$lib/stores";
+  import { Bot, Settings } from "lucide-svelte";
+  import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId, llmMode, selectedModel, llmService, availableModels } from "$lib/stores";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
   import { onMount, onDestroy } from "svelte";
@@ -11,24 +11,30 @@
   let chatService: ChatService | null = null;
   let previousMessageCount = 0;
   const baseUrl = import.meta.env.VITE_MIXCORE_PREVIEW_ENDPOINT || 'https://mixcore.net';
+  
+  // Mode selection logic
+  let currentMode: 'mixcore' | 'external' = 'mixcore';
+  $: currentMode = $llmMode;
 
-  onMount(async () => {
-    try {
-      chatService = new ChatService({
-        baseUrl: baseUrl,
-        hubPath: "/hub/llm_chat",
-        accessTokenFactory: () => localStorage.getItem("mixcore_access_token") || "",
-        automaticReconnect: true,
-        onConnected: () => {
-          console.log("SignalR connected to llm_chat hub");
-        },
-        onDisconnected: (error) => {
-          console.log("SignalR disconnected", error);
-        },
-        onError: (error) => {
-          console.error("SignalR connection error:", error);
-        }
-      });
+  // Initialize services based on current mode
+  async function initializeServices() {
+    if (currentMode === 'mixcore') {
+      try {
+        chatService = new ChatService({
+          baseUrl: baseUrl,
+          hubPath: "/hub/llm_chat",
+          accessTokenFactory: () => localStorage.getItem("mixcore_access_token") || "",
+          automaticReconnect: true,
+          onConnected: () => {
+            console.log("SignalR connected to llm_chat hub");
+          },
+          onDisconnected: (error) => {
+            console.log("SignalR disconnected", error);
+          },
+          onError: (error) => {
+            console.error("SignalR connection error:", error);
+          }
+        });
 
       // Handle streaming messages
       chatService.onStreaming((chunk: string, isComplete: boolean) => {
@@ -90,11 +96,32 @@
         console.log('Raw SignalR message received:', message);
       });
 
-      await chatService.start();
-    } catch (error) {
-      console.error("Failed to initialize chat service:", error);
+        await chatService.start();
+      } catch (error) {
+        console.error("Failed to initialize Mixcore chat service:", error);
+      }
+    } else {
+      // External LLM mode - no SignalR service needed
+      // Messages will be handled through llmService
+      console.log("External LLM mode initialized with model:", $selectedModel);
     }
+  }
+
+  onMount(async () => {
+    await initializeServices();
   });
+
+  // Re-initialize when mode changes
+  $: if (currentMode) {
+    if (chatService && currentMode === 'external') {
+      // Cleanup Mixcore service when switching to external
+      chatService.dispose();
+      chatService = null;
+    } else if (!chatService && currentMode === 'mixcore') {
+      // Initialize Mixcore service when switching from external
+      initializeServices();
+    }
+  }
 
   onDestroy(() => {
     if (chatService) {
@@ -118,15 +145,62 @@
 </script>
 
 <div class="flex flex-col h-full bg-base-100">
+  <!-- Mode Selection Header -->
+  <div class="p-4 border-b border-base-300">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <Settings class="w-4 h-4" />
+        <span class="text-sm font-medium">LLM Mode</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          class="btn btn-xs {currentMode === 'mixcore' ? 'btn-primary' : 'btn-outline'}"
+          on:click={() => llmMode.set('mixcore')}
+        >
+          Mixcore Stream
+        </button>
+        <button
+          class="btn btn-xs {currentMode === 'external' ? 'btn-primary' : 'btn-outline'}"
+          on:click={() => llmMode.set('external')}
+        >
+          External LLMs
+        </button>
+      </div>
+    </div>
+    
+    {#if currentMode === 'external'}
+      <div class="mt-2 flex items-center gap-2">
+        <span class="text-xs text-base-content/60">Model:</span>
+        <select 
+          class="select select-xs select-bordered" 
+          bind:value={$selectedModel}
+        >
+          {#each availableModels.filter(m => m.provider !== 'Mixcore') as model}
+            <option value={model}>{model.name} ({model.provider})</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+  </div>
+  
   <!-- Chat Messages -->
   <div bind:this={chatContainer} class="flex-1 overflow-y-auto p-4 space-y-4">
     {#if $chatMessages.length === 0}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Bot class="w-12 h-12 text-base-content/60 mb-4" />
-        <h3 class="text-lg font-medium mb-2">Welcome to your Mixcore AI assistant</h3>
+        <h3 class="text-lg font-medium mb-2">
+          {#if currentMode === 'mixcore'}
+            Welcome to your Mixcore AI assistant
+          {:else}
+            Welcome to your AI assistant
+          {/if}
+        </h3>
         <p class="text-sm text-base-content/60 max-w-sm">
-          Describe what you want to build and I'll help you create it step by
-          step.
+          {#if currentMode === 'mixcore'}
+            Using Mixcore Streaming API - Describe what you want to build and I'll help you create it step by step.
+          {:else}
+            Using {$selectedModel.name} - Describe what you want to build and I'll help you create it step by step.
+          {/if}
         </p>
       </div>
     {:else}
@@ -167,6 +241,6 @@
 
   <!-- Chat Input -->
   <div class="p-4 border-t border-base-300">
-    <ChatInput {chatService} />
+    <ChatInput {chatService} {currentMode} />
   </div>
 </div>

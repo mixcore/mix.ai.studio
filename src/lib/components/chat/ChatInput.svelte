@@ -6,14 +6,22 @@
     chatLoading,
     chatMessages,
     chatStreaming,
+    selectedModel,
+    llmService
   } from "$lib/stores";
   import { cn } from "$lib/utils";
   import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
 
   // Props
   export let chatService: ChatService | null;
+  export let currentMode: 'mixcore' | 'external' = 'mixcore';
   export let maxLength = 4000;
   export let placeholder = "Ask mixcore.ai to build your app...";
+  
+  // Dynamic placeholder based on mode
+  $: dynamicPlaceholder = currentMode === 'mixcore' 
+    ? "Ask Mixcore AI to build your app..." 
+    : `Ask ${$selectedModel?.name || 'AI'} to help you...`;
   export let allowFileUpload = true;
 
   // Component state
@@ -61,7 +69,7 @@
 
   // Message sending logic
   async function sendMessage() {
-    if (!chatService || $chatLoading || $chatStreaming) return;
+    if ($chatLoading || $chatStreaming) return;
 
     const rawInput = $chatInput;
     const sanitizedInput = sanitizeInput(rawInput);
@@ -73,8 +81,15 @@
       return;
     }
 
-    if (!chatService.isConnected()) {
-      errorMessage = "Not connected to chat service";
+    // Mode-specific validation
+    if (currentMode === 'mixcore' && (!chatService || !chatService.isConnected())) {
+      errorMessage = "Not connected to Mixcore chat service";
+      setTimeout(() => errorMessage = "", 3000);
+      return;
+    }
+
+    if (currentMode === 'external' && !$selectedModel) {
+      errorMessage = "No LLM model selected";
       setTimeout(() => errorMessage = "", 3000);
       return;
     }
@@ -103,12 +118,50 @@
         immediateResize();
       });
       
-      // Send message to backend after UI updates
-      await chatService.sendMessage(sanitizedInput);
+      // Handle different modes
+      if (currentMode === 'mixcore') {
+        // Use Mixcore streaming service
+        await chatService.sendMessage(sanitizedInput);
+      } else {
+        // Use external LLM service
+        await sendExternalLLMMessage(sanitizedInput);
+      }
       
     } catch (error) {
       console.error("Failed to send message:", error);
       errorMessage = "Failed to send message. Please try again.";
+      setTimeout(() => errorMessage = "", 5000);
+      chatLoading.set(false);
+    }
+  }
+
+  // Handle external LLM message sending
+  async function sendExternalLLMMessage(message: string) {
+    try {
+      const response = await llmService.sendMessage([
+        { role: 'user', content: message }
+      ], {
+        provider: $selectedModel.provider.toLowerCase() as any,
+        model: $selectedModel.id
+      });
+
+      if (response.content) {
+        // Add AI response to chat
+        chatMessages.update(messages => [
+          ...messages,
+          {
+            id: crypto.randomUUID(),
+            content: response.content,
+            role: "assistant",
+            timestamp: new Date().toISOString(),
+          }
+        ]);
+      }
+
+      chatLoading.set(false);
+    } catch (error) {
+      console.error("Failed to get response from external LLM:", error);
+      errorMessage = "Failed to get response. Please check your API configuration.";
       setTimeout(() => errorMessage = "", 5000);
       chatLoading.set(false);
     }
@@ -303,7 +356,7 @@
     <textarea
       bind:this={textArea}
       bind:value={$chatInput}
-      {placeholder}
+      placeholder={dynamicPlaceholder}
       maxlength={maxLength}
       class={cn(
         "w-full min-h-[60px] max-h-[200px] p-4 pr-20 text-sm",

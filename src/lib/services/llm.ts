@@ -84,25 +84,42 @@ const DEFAULT_CONFIG: LLMConfig = {
       name: 'OpenAI',
       models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'],
       baseUrl: 'https://api.openai.com/v1',
-      isEnabled: false
+      apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+      isEnabled: !!import.meta.env.VITE_OPENAI_API_KEY
     },
     claude: {
       name: 'Anthropic Claude',
-      models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'],
+      models: [
+        'claude-opus-4-1-20250805',
+        'claude-opus-4-20250514', 
+        'claude-sonnet-4-20250514',
+        'claude-3-7-sonnet-20250219',
+        'claude-3-5-haiku-20241022',
+        'claude-3-haiku-20240307'
+      ],
       baseUrl: 'https://api.anthropic.com/v1',
-      isEnabled: false
+      apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
+      isEnabled: !!import.meta.env.VITE_CLAUDE_API_KEY
     },
     gemini: {
       name: 'Google Gemini',
       models: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'],
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-      isEnabled: false
+      apiKey: import.meta.env.VITE_GEMINI_API_KEY,
+      isEnabled: !!import.meta.env.VITE_GEMINI_API_KEY
     },
     deepseek: {
       name: 'DeepSeek',
       models: ['deepseek-chat', 'deepseek-coder'],
       baseUrl: 'https://api.deepseek.com/v1',
-      isEnabled: false
+      apiKey: import.meta.env.VITE_DEEPSEEK_API_KEY,
+      isEnabled: !!import.meta.env.VITE_DEEPSEEK_API_KEY
+    },
+    mixcore: {
+      name: 'Mixcore',
+      models: ['mixcore-streaming'],
+      baseUrl: 'https://mixcore.net/api/v1/llm',
+      isEnabled: true
     }
   },
   mcpConnections: {
@@ -347,7 +364,7 @@ export class LLMService {
       // Format result for LLM
       if (result.content) {
         return Array.isArray(result.content) 
-          ? result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\n')
+          ? result.content.map((c: any) => c.type === 'text' ? c.text : JSON.stringify(c)).join('\n')
           : typeof result.content === 'string' 
             ? result.content 
             : JSON.stringify(result.content);
