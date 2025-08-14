@@ -6,9 +6,12 @@
     chatLoading,
     chatMessages,
     chatStreaming,
+    chatStreamingMessage,
+    chatStreamingMessageId,
     selectedModel,
     llmService
   } from "$lib/stores";
+  import { mcpTools } from "$lib/stores/mcp";
   import { cn } from "$lib/utils";
   import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
 
@@ -158,6 +161,20 @@
       const providers = llmService.getProviders();
       const providerConfig = providers[providerKey];
       
+      console.log('Provider config for', providerKey, ':', {
+        name: providerConfig?.name,
+        isEnabled: providerConfig?.isEnabled,
+        hasApiKey: !!providerConfig?.apiKey,
+        apiKeyPreview: providerConfig?.apiKey ? `${providerConfig.apiKey.substring(0, 10)}...` : 'none'
+      });
+
+      // Debug MCP tools availability
+      console.log('Available MCP tools:', $mcpTools.length, $mcpTools.map(t => ({
+        server: t.serverName,
+        tool: t.tool.name,
+        description: t.tool.description
+      })));
+      
       if (!providerConfig) {
         throw new Error(`Provider ${providerKey} is not configured`);
       }
@@ -166,20 +183,70 @@
         throw new Error(`Provider ${providerKey} is not enabled. Please check your API key configuration.`);
       }
       
-      if (!providerConfig.apiKey) {
+      if (!providerConfig.apiKey || providerConfig.apiKey.includes('your-') || providerConfig.apiKey.includes('api-key-here')) {
         const envKeyName = providerKey === 'claude' ? 'VITE_CLAUDE_API_KEY' : `VITE_${providerKey.toUpperCase()}_API_KEY`;
-        throw new Error(`API key is missing for provider ${providerKey}. Please add ${envKeyName} to your environment.`);
+        throw new Error(`API key is missing or placeholder for provider ${providerKey}. Please add a real ${envKeyName} to your environment.`);
       }
       
+      // Set up streaming state
+      let streamingMessageId = crypto.randomUUID();
+      let streamingCompleted = false;
+      
+      chatStreaming.set(true);
+      chatStreamingMessage.set('');
+      chatStreamingMessageId.set(streamingMessageId);
+      chatLoading.set(false); // Turn off loading when streaming starts
+
       const response = await llmService.sendMessage([
         { role: 'user', content: message }
       ], {
         provider: providerKey,
-        model: $selectedModel.id
+        model: $selectedModel.id,
+        useMCPTools: true,  // Enable MCP tools for external LLMs
+        stream: true,       // Enable streaming for external LLMs
+        onChunk: (chunk: string, isComplete: boolean) => {
+          console.log('Streaming chunk:', { chunk: chunk.substring(0, 50) + '...', isComplete, streamingCompleted });
+          
+          if (isComplete) {
+            // Streaming complete - add final message and reset streaming state
+            const finalMessage = $chatStreamingMessage;
+            console.log('Streaming complete. Final message length:', finalMessage.length, 'Already completed:', streamingCompleted);
+            
+            if (finalMessage && !streamingCompleted) {
+              streamingCompleted = true;
+              console.log('Adding final streaming message to chat');
+              chatMessages.update(messages => [
+                ...messages,
+                {
+                  id: streamingMessageId,
+                  content: finalMessage,
+                  role: "assistant",
+                  timestamp: new Date().toISOString(),
+                }
+              ]);
+            }
+            
+            // Reset streaming state
+            chatStreaming.set(false);
+            chatStreamingMessage.set('');
+            chatStreamingMessageId.set(null);
+          } else {
+            // Accumulate streaming chunk
+            chatStreamingMessage.update((current: string) => current + chunk);
+          }
+        }
       });
 
-      if (response.content) {
-        // Add AI response to chat
+      // Fallback for non-streaming response (only if streaming didn't complete)
+      console.log('Checking fallback:', { 
+        hasContent: !!response.content, 
+        streamingCompleted, 
+        isStreaming: $chatStreaming,
+        responseLength: response.content?.length || 0
+      });
+      
+      if (response.content && !streamingCompleted && !$chatStreaming) {
+        console.log('Adding fallback response to chat');
         chatMessages.update(messages => [
           ...messages,
           {
@@ -201,8 +268,18 @@
         errorMessage = errorMsg;
       } else if (errorMsg.includes("not configured")) {
         errorMessage = `Provider ${getProviderKey($selectedModel.provider)} is not configured in the system.`;
+      } else if (errorMsg.includes("Failed to fetch") || errorMsg.includes("CORS")) {
+        errorMessage = "Network error. Please restart the development server and try again.";
+      } else if (errorMsg.includes("anthropic-dangerous-direct-browser-access")) {
+        errorMessage = "Claude API security header issue. This should be fixed automatically - please try again.";
+      } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+        errorMessage = `Invalid API key for ${$selectedModel.provider}. Please check your VITE_CLAUDE_API_KEY in the .env file.`;
+      } else if (errorMsg.includes("429") || errorMsg.includes("rate limit")) {
+        errorMessage = "Rate limit exceeded. Please try again later.";
+      } else if (errorMsg.includes("529") || errorMsg.includes("Overloaded")) {
+        errorMessage = "Claude servers are currently overloaded. Please try again in a few minutes.";
       } else {
-        errorMessage = "Failed to get response. Please check your API configuration.";
+        errorMessage = `Failed to get response: ${errorMsg}`;
       }
       
       setTimeout(() => errorMessage = "", 8000);

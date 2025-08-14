@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
 		],
 		server: {
 			// Enable HTTPS
-			https: true,
+			https: {},
 			// Configure host and port
 			host: '0.0.0.0', // Allow external connections
 			port: 5173,
@@ -24,6 +24,31 @@ export default defineConfig(({ mode }) => {
 					target: env.VITE_PROXY_TARGET || 'https://localhost:5001',
 					changeOrigin: true,
 					secure: false
+				},
+				// Proxy for external LLM APIs to avoid CORS
+				'/proxy/anthropic': {
+					target: 'https://api.anthropic.com',
+					changeOrigin: true,
+					secure: true,
+					rewrite: (path) => path.replace(/^\/proxy\/anthropic/, '')
+				},
+				'/proxy/openai': {
+					target: 'https://api.openai.com',
+					changeOrigin: true,
+					secure: true,
+					rewrite: (path) => path.replace(/^\/proxy\/openai/, '')
+				},
+				'/proxy/gemini': {
+					target: 'https://generativelanguage.googleapis.com',
+					changeOrigin: true,
+					secure: true,
+					rewrite: (path) => path.replace(/^\/proxy\/gemini/, '')
+				},
+				'/proxy/deepseek': {
+					target: 'https://api.deepseek.com',
+					changeOrigin: true,
+					secure: true,
+					rewrite: (path) => path.replace(/^\/proxy\/deepseek/, '')
 				}
 			}
 		}

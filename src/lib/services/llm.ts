@@ -83,7 +83,7 @@ const DEFAULT_CONFIG: LLMConfig = {
     openai: {
       name: 'OpenAI',
       models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'],
-      baseUrl: 'https://api.openai.com/v1',
+      baseUrl: '/proxy/openai/v1',
       apiKey: import.meta.env.VITE_OPENAI_API_KEY,
       isEnabled: !!import.meta.env.VITE_OPENAI_API_KEY
     },
@@ -97,21 +97,21 @@ const DEFAULT_CONFIG: LLMConfig = {
         'claude-3-5-haiku-20241022',
         'claude-3-haiku-20240307'
       ],
-      baseUrl: 'https://api.anthropic.com/v1',
+      baseUrl: '/proxy/anthropic/v1',
       apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
       isEnabled: !!import.meta.env.VITE_CLAUDE_API_KEY
     },
     gemini: {
       name: 'Google Gemini',
       models: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'],
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      baseUrl: '/proxy/gemini/v1beta',
       apiKey: import.meta.env.VITE_GEMINI_API_KEY,
       isEnabled: !!import.meta.env.VITE_GEMINI_API_KEY
     },
     deepseek: {
       name: 'DeepSeek',
       models: ['deepseek-chat', 'deepseek-coder'],
-      baseUrl: 'https://api.deepseek.com/v1',
+      baseUrl: '/proxy/deepseek/v1',
       apiKey: import.meta.env.VITE_DEEPSEEK_API_KEY,
       isEnabled: !!import.meta.env.VITE_DEEPSEEK_API_KEY
     },
@@ -486,6 +486,12 @@ export class LLMService {
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
+    // Handle streaming response
+    if (options.stream && response.body) {
+      return this.handleOpenAIStream(response, model, options);
+    }
+
+    // Handle non-streaming response
     const data = await response.json();
     const message = data.choices[0].message;
     
@@ -501,39 +507,172 @@ export class LLMService {
     };
   }
 
+  // Handle OpenAI streaming response
+  private async handleOpenAIStream(response: Response, model: string, options: any): Promise<LLMResponse> {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let content = '';
+    let usage: any = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              break;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta;
+              
+              if (delta?.content) {
+                content += delta.content;
+                // Emit streaming chunk for real-time updates
+                if (options.onChunk) {
+                  options.onChunk(delta.content, false);
+                }
+              }
+              
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+      
+      // Signal completion
+      if (options.onChunk) {
+        options.onChunk('', true);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return {
+      content,
+      model,
+      usage
+    };
+  }
+
   // Claude API integration
   private async sendToClaude(messages: LLMMessage[], model: string, options: any): Promise<LLMResponse> {
     const provider = this.config.providers.claude;
     
+    const requestBody = {
+      model,
+      messages: messages.filter(m => m.role !== 'system').map(m => ({ 
+        role: m.role, 
+        content: m.content 
+      })),
+      system: messages.find(m => m.role === 'system')?.content,
+      max_tokens: options.maxTokens || this.config.maxTokens,
+      temperature: options.temperature || this.config.temperature,
+      stream: options.stream || false
+    };
+
     const response = await fetch(`${provider.baseUrl}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': provider.apiKey!,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
-      body: JSON.stringify({
-        model,
-        messages: messages.filter(m => m.role !== 'system').map(m => ({ 
-          role: m.role, 
-          content: m.content 
-        })),
-        system: messages.find(m => m.role === 'system')?.content,
-        max_tokens: options.maxTokens || this.config.maxTokens,
-        temperature: options.temperature || this.config.temperature
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status}`);
+      let errorMessage = `Claude API error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error?.message) {
+          errorMessage += ` - ${errorData.error.message}`;
+        }
+      } catch (e) {
+        // If we can't parse the error response, just use the status
+      }
+      throw new Error(errorMessage);
     }
 
+    // Handle streaming response
+    if (options.stream && response.body) {
+      return this.handleClaudeStream(response, model, options);
+    }
+
+    // Handle non-streaming response
     const data = await response.json();
     
     return {
       content: data.content[0].text,
       model: data.model,
       usage: data.usage
+    };
+  }
+
+  // Handle Claude streaming response
+  private async handleClaudeStream(response: Response, model: string, options: any): Promise<LLMResponse> {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let content = '';
+    let usage: any = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              break;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                content += parsed.delta.text;
+                // Emit streaming chunk for real-time updates
+                if (options.onChunk) {
+                  options.onChunk(parsed.delta.text, false);
+                }
+              } else if (parsed.type === 'message_stop') {
+                if (options.onChunk) {
+                  options.onChunk('', true); // Signal completion
+                }
+              } else if (parsed.usage) {
+                usage = parsed.usage;
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return {
+      content,
+      model,
+      usage
     };
   }
 

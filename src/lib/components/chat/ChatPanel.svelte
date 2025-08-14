@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Bot, Settings } from "lucide-svelte";
   import { chatMessages, chatLoading, chatStreaming, chatStreamingMessage, chatStreamingMessageId, llmMode, selectedModel, llmService, availableModels } from "$lib/stores";
+  import { mcpTools, mcpConnections } from "$lib/stores/mcp";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
   import { onMount, onDestroy } from "svelte";
@@ -188,6 +189,19 @@
             <option value={model}>{model.name} ({model.provider})</option>
           {/each}
         </select>
+      </div>
+      
+      <!-- MCP Tools Status -->
+      <div class="mt-2 flex items-center gap-2">
+        <span class="text-xs text-base-content/60">MCP Tools:</span>
+        <div class="badge badge-xs {$mcpTools.length > 0 ? 'badge-success' : 'badge-neutral'}">
+          {$mcpTools.length} tools from {$mcpConnections.filter(c => c.connected).length} servers
+        </div>
+        {#if $mcpTools.length > 0}
+          <span class="text-xs text-base-content/40">
+            ({$mcpTools.map(t => t.tool.name).join(', ')})
+          </span>
+        {/if}
       </div>
     {/if}
   </div>
