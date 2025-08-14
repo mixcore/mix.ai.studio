@@ -1,19 +1,32 @@
 <script lang="ts">
-  import { Send, Image, Eye, MessageSquare, AlertCircle } from "lucide-svelte";
+  import { Send, Image, AlertCircle } from "lucide-svelte";
   import { onDestroy } from "svelte";
   import {
     chatInput,
     chatLoading,
     chatMessages,
     chatStreaming,
+    chatStreamingMessage,
+    chatStreamingMessageId,
+    selectedModel,
+    llmService,
+    templateUpdateTrigger,
+    shouldRefreshPreview
   } from "$lib/stores";
+  import { mcpTools } from "$lib/stores/mcp";
   import { cn } from "$lib/utils";
   import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
 
   // Props
   export let chatService: ChatService | null;
+  export let currentMode: 'mixcore' | 'external' = 'mixcore';
   export let maxLength = 4000;
   export let placeholder = "Ask mixcore.ai to build your app...";
+  
+  // Dynamic placeholder based on mode
+  $: dynamicPlaceholder = currentMode === 'mixcore' 
+    ? "Ask Mixcore AI to build your app..." 
+    : `Ask ${$selectedModel?.name || 'AI'} to help you...`;
   export let allowFileUpload = true;
 
   // Component state
@@ -61,7 +74,7 @@
 
   // Message sending logic
   async function sendMessage() {
-    if (!chatService || $chatLoading || $chatStreaming) return;
+    if ($chatLoading || $chatStreaming) return;
 
     const rawInput = $chatInput;
     const sanitizedInput = sanitizeInput(rawInput);
@@ -73,8 +86,15 @@
       return;
     }
 
-    if (!chatService.isConnected()) {
-      errorMessage = "Not connected to chat service";
+    // Mode-specific validation
+    if (currentMode === 'mixcore' && (!chatService || !chatService.isConnected())) {
+      errorMessage = "Not connected to Mixcore chat service";
+      setTimeout(() => errorMessage = "", 3000);
+      return;
+    }
+
+    if (currentMode === 'external' && !$selectedModel) {
+      errorMessage = "No LLM model selected";
       setTimeout(() => errorMessage = "", 3000);
       return;
     }
@@ -103,13 +123,385 @@
         immediateResize();
       });
       
-      // Send message to backend after UI updates
-      await chatService.sendMessage(sanitizedInput);
+      // Handle different modes
+      if (currentMode === 'mixcore') {
+        // Use Mixcore streaming service
+        await chatService.sendMessage(sanitizedInput);
+      } else {
+        // Use external LLM service
+        await sendExternalLLMMessage(sanitizedInput);
+      }
       
     } catch (error) {
       console.error("Failed to send message:", error);
       errorMessage = "Failed to send message. Please try again.";
       setTimeout(() => errorMessage = "", 5000);
+      chatLoading.set(false);
+    }
+  }
+
+  // Map display provider names to internal service keys
+  function getProviderKey(displayProvider: string): string {
+    const providerMap: Record<string, string> = {
+      'OpenAI': 'openai',
+      'Anthropic': 'claude',
+      'Google': 'gemini',
+      'DeepSeek': 'deepseek',
+      'Groq': 'groq',
+      'Mistral': 'mistral'
+    };
+    return providerMap[displayProvider] || displayProvider.toLowerCase();
+  }
+
+  // Create system prompt with MCP context
+  function createMCPSystemPrompt(mcpTools: Array<{ serverId: string; serverName: string; tool: any }>): string {
+    if (!mcpTools || mcpTools.length === 0) {
+      return `# Mixcore AI Studio - CTO Agent
+
+You are an advanced CTO-level AI agent specializing in Mixcore CMS development and enterprise web architecture. You combine strategic technical leadership with hands-on development expertise.
+
+## Core Identity & Approach
+- **Role**: Chief Technology Officer Agent for Mixcore AI Studio
+- **Expertise**: ASP.NET Core MVC, Razor Templates, Dynamic Database Architecture, AI-First Development
+- **Methodology**: Strategic planning → Technical architecture → Implementation → Documentation
+- **Standards**: Enterprise-grade security, scalability, maintainability, and performance
+
+## Your Capabilities
+- 🏗️ **Enterprise Architecture**: Design scalable, maintainable web applications
+- 💾 **Database Design**: Schema optimization, relationship modeling, performance tuning
+- 🎨 **Frontend Excellence**: Modern UI/UX with responsive design patterns
+- 🔒 **Security First**: Authentication, authorization, data protection, CSRF prevention
+- 📈 **Performance Optimization**: Caching strategies, query optimization, CDN integration
+- 🚀 **DevOps Integration**: CI/CD pipelines, containerization, cloud deployment strategies
+- 📚 **Technical Leadership**: Code reviews, best practices, team mentoring, project planning
+
+## Development Principles
+1. **Security by Design**: Always implement secure coding practices
+2. **Performance First**: Optimize for speed and scalability from the start
+3. **Maintainable Code**: Clean architecture, SOLID principles, comprehensive documentation
+4. **User-Centered Design**: Focus on exceptional user experience and accessibility
+5. **Continuous Innovation**: Leverage latest technologies and best practices
+
+Always provide strategic insights, architectural guidance, and production-ready solutions that align with enterprise standards and CTO-level decision making.`;
+    }
+
+    const toolDescriptions = mcpTools
+      .map(({ tool }) => `- **${tool.name}**: ${tool.description}`)
+      .join('\n');
+
+    const serverList = [...new Set(mcpTools.map(t => t.serverName))].join(', ');
+
+    return `# Mixcore AI Studio - CTO Agent with MCP Integration
+
+You are an elite CTO-level AI agent specializing in **Mixcore CMS** development with full access to ${mcpTools.length} MCP tools from ${serverList}. You operate as a strategic technical leader combining enterprise architecture expertise with hands-on Mixcore development mastery.
+
+## 🎯 Core Identity
+**Role**: Chief Technology Officer Agent  
+**Expertise**: Mixcore CMS, ASP.NET Core MVC, Razor Templates, Dynamic MixDb, MCP Protocol  
+**Approach**: MCP Tools First → Strategic Architecture → Implementation → Documentation  
+
+## 🏗️ Mixcore CMS Mastery
+
+### Template Architecture (folderType enum)
+- **Masters (7)**: Site-wide layouts - Required first, includes @RenderBody(), sections
+- **Pages (1)**: Page templates using PageContentViewModel
+- **Modules (2)**: Reusable components using ModuleContentViewModel  
+- **Posts (5)**: Blog/article templates using PostContentViewModel
+- **Forms (3)**: Input forms with validation and data binding
+- **Widgets (6)**: UI components for dynamic layouts
+
+### MixDb Dynamic Database Patterns
+\`\`\`csharp
+// Natural Language Schema Creation
+CreateDatabaseFromPrompt("Create products table with name, price, description, images, category relationships")
+
+// Type-Safe Field Access in Razor
+@(product.Value<string>("name"))
+@(product.Value<decimal>("price"))
+@(product.Value<DateTime>("created_date"))
+
+// Advanced Querying with Relationships
+var request = new SearchMixDbRequestModel {
+    TableName = "mix_products",
+    LoadNestedData = true, // Include relationships
+    Queries = new List<MixQueryField>()
+};
+\`\`\`
+
+### Required Razor Template Patterns
+\`\`\`csharp
+@using Mix.Mixdb.Interfaces
+@using Mix.Shared.Models
+@using Mix.Shared.Dtos
+@inject Mix.Database.Services.MixGlobalSettings.DatabaseService dbSrv
+@inject IMixDbDataServiceFactory mixDbDataServiceFactory
+
+// CSS Escaping in Razor
+@@media (max-width: 768px) { .responsive { display: block; } }
+
+// Master Layout Requirements
+@RenderSection("Schema", false)
+@RenderSection("Seo", false)
+@RenderSection("Styles", false)  
+@RenderSection("Scripts", false)
+\`\`\`
+
+## 🛠️ Available MCP Tools (${mcpTools.length} tools)
+
+### Template & Content Management
+${toolDescriptions.includes('CreateTemplate') ? '- **CreateTemplate**: Create Razor templates with proper folderType' : ''}
+${toolDescriptions.includes('CreatePageContent') ? '- **CreatePageContent**: Generate page instances with SEO optimization' : ''}
+${toolDescriptions.includes('CreateModuleContent') ? '- **CreateModuleContent**: Build reusable component modules' : ''}
+${toolDescriptions.includes('CreatePostContent') ? '- **CreatePostContent**: Develop blog/article content' : ''}
+
+### Dynamic Database Operations  
+${toolDescriptions.includes('CreateDatabaseFromPrompt') ? '- **CreateDatabaseFromPrompt**: AI-powered schema generation' : ''}
+${toolDescriptions.includes('CreateManyMixDbData') ? '- **CreateManyMixDbData**: Bulk data population' : ''}
+${toolDescriptions.includes('GetListMixDbData') ? '- **GetListMixDbData**: Advanced querying with filters/sorting' : ''}
+${toolDescriptions.includes('CreateMixDbRelationshipFromPrompt') ? '- **CreateMixDbRelationshipFromPrompt**: Define table relationships' : ''}
+
+### All Available Tools
+${toolDescriptions}
+
+## 🚀 CTO-Level Development Workflow
+
+### 1. Strategic Planning Phase
+- **Architecture Analysis**: Assess requirements, scalability needs, performance targets
+- **Technology Stack Decision**: Choose optimal patterns for the use case
+- **Security Framework**: Implement authentication, authorization, data protection
+- **Performance Strategy**: Caching, optimization, CDN integration planning
+
+### 2. Implementation Phase
+\`\`\`csharp
+// Standard Workflow
+1. ListTemplates() → Verify existing infrastructure
+2. CreateTemplate(folderType: 7) → Master Layout foundation
+3. CreateTemplate(folderType: 1,2,5) → Content templates  
+4. CreateDatabaseFromPrompt() → Dynamic schema design
+5. CreateManyMixDbData() → Data population
+6. Create[Content]() → Content instances with associations
+7. Document in project-progress.md
+\`\`\`
+
+### 3. Quality Assurance
+- **Code Review**: SOLID principles, security patterns, performance optimization
+- **Testing Strategy**: Unit tests, integration tests, security testing
+- **Documentation**: Technical specs, API documentation, deployment guides
+- **Monitoring**: Performance metrics, error tracking, user analytics
+
+## 💡 CTO Decision Framework
+
+### Technology Choices
+- **When to use MCP tools vs C# code**: Always prefer MCP tools for Mixcore operations
+- **Performance vs Development Speed**: Balance based on project scale and timeline
+- **Security Trade-offs**: Never compromise security for convenience
+- **Scalability Planning**: Design for 10x growth from day one
+
+### Architecture Patterns
+- **Modular Design**: Reusable components, clear separation of concerns
+- **Data Relationships**: Proper normalization, efficient queries, caching strategies  
+- **UI/UX Excellence**: Responsive design, accessibility, progressive enhancement
+- **API Design**: RESTful principles, versioning, rate limiting, documentation
+
+## 🎯 Execution Excellence
+
+### Project Delivery Standards
+1. **Always start with ListTemplates()** to understand existing infrastructure
+2. **Create Master Layout first** (folderType: 7) before any content templates
+3. **Use full public URLs** for all images (https://images.unsplash.com/...)
+4. **Document all MCP tool usage** and effectiveness in project files
+5. **Implement proper error handling** and user feedback mechanisms
+6. **Optimize for performance** with efficient queries and caching
+7. **Auto Preview Refresh**: Template operations automatically refresh the preview iframe
+
+### Communication Style
+- **Strategic Insights**: Explain architectural decisions and trade-offs
+- **Technical Depth**: Provide detailed implementation guidance
+- **Business Impact**: Connect technical decisions to business outcomes
+- **Risk Assessment**: Identify potential issues and mitigation strategies
+- **Team Enablement**: Share knowledge and best practices
+
+You combine the strategic thinking of a CTO with the technical mastery of a senior architect, always delivering enterprise-grade solutions that scale and perform at the highest level.`;
+  }
+
+  // Detect template operations in responses and trigger iframe refresh
+  function detectTemplateOperations(responseContent: string): boolean {
+    const templateOperations = [
+      'CreateTemplate',
+      'UpdateTemplate', 
+      'CreatePageContent',
+      'UpdatePageContent',
+      'CreateModuleContent',
+      'UpdateModuleContent',
+      'CreatePostContent',
+      'UpdatePostContent',
+      'template created',
+      'template updated',
+      'page created',
+      'page updated',
+      'module created',
+      'module updated',
+      'content created',
+      'content updated'
+    ];
+    
+    const content = responseContent.toLowerCase();
+    const hasTemplateOp = templateOperations.some(op => content.includes(op.toLowerCase()));
+    
+    if (hasTemplateOp) {
+      console.log('🔍 Template operation detected in response:', {
+        responseLength: responseContent.length,
+        detectedOperations: templateOperations.filter(op => content.includes(op.toLowerCase()))
+      });
+    }
+    
+    return hasTemplateOp;
+  }
+
+  // Trigger iframe refresh
+  function triggerPreviewRefresh() {
+    console.log('🔄 Template operation detected, triggering preview refresh');
+    templateUpdateTrigger.update((n: number) => n + 1);
+    shouldRefreshPreview.set(true);
+    
+    // Auto-clear the refresh flag after a short delay
+    setTimeout(() => {
+      shouldRefreshPreview.set(false);
+    }, 2000);
+  }
+
+  // Handle external LLM message sending
+  async function sendExternalLLMMessage(message: string) {
+    try {
+      const providerKey = getProviderKey($selectedModel.provider);
+      
+      // Check if provider is configured and enabled
+      const providers = llmService.getProviders();
+      const providerConfig = providers[providerKey];
+      
+      if (!providerConfig) {
+        throw new Error(`Provider ${providerKey} is not configured`);
+      }
+      
+      if (!providerConfig.isEnabled) {
+        throw new Error(`Provider ${providerKey} is not enabled. Please check your API key configuration.`);
+      }
+      
+      // Skip API key validation for Mixcore (uses token-based authentication)
+      if (providerKey !== 'mixcore' && (!providerConfig.apiKey || providerConfig.apiKey.includes('your-') || providerConfig.apiKey.includes('api-key-here'))) {
+        const envKeyName = providerKey === 'claude' ? 'VITE_CLAUDE_API_KEY' : `VITE_${providerKey.toUpperCase()}_API_KEY`;
+        throw new Error(`API key is missing or placeholder for provider ${providerKey}. Please add a real ${envKeyName} to your environment.`);
+      }
+      
+      // Set up streaming state
+      let streamingMessageId = crypto.randomUUID();
+      let streamingCompleted = false;
+      
+  chatStreaming.set(true);
+  chatStreamingMessage.set('');
+  chatStreamingMessageId.set(streamingMessageId);
+  chatLoading.set(false); // Turn off loading when streaming starts
+  console.log('[DEBUG] Streaming started, messageId:', streamingMessageId);
+
+      // Create system prompt with MCP context
+      const mcpSystemPrompt = createMCPSystemPrompt($mcpTools);
+      const messages = mcpSystemPrompt 
+        ? [
+            { role: 'system' as const, content: mcpSystemPrompt },
+            { role: 'user' as const, content: message }
+          ]
+        : [{ role: 'user' as const, content: message }];
+
+      const response = await llmService.sendMessage(messages, {
+        provider: providerKey,
+        model: $selectedModel.id,
+        useMCPTools: true,  // Enable MCP tools for external LLMs
+        stream: true,       // Enable streaming for external LLMs
+        onChunk: (chunk: string, isComplete: boolean) => {
+          if (!chatStreaming) {
+            chatStreaming.set(true);
+            console.log('[DEBUG] chatStreaming set to true on first chunk');
+          }
+          if (!isComplete) {
+            // Accumulate streaming chunk and display in real-time
+            console.log('[DEBUG] Streaming chunk received:', chunk);
+            chatStreamingMessage.update((current: string) => {
+              const updated = current + chunk;
+              console.log('[DEBUG] chatStreamingMessage updated:', updated);
+              return updated;
+            });
+          } else {
+            // Streaming complete - add final message and reset streaming state
+            const finalMessage = $chatStreamingMessage;
+            console.log('[DEBUG] Streaming complete. Final message:', finalMessage);
+            if (finalMessage && !streamingCompleted) {
+              streamingCompleted = true;
+              // Check if response contains template operations and trigger refresh
+              if (detectTemplateOperations(finalMessage)) {
+                triggerPreviewRefresh();
+              }
+              chatMessages.update(messages => [
+                ...messages,
+                {
+                  id: streamingMessageId,
+                  content: finalMessage,
+                  role: "assistant",
+                  timestamp: new Date().toISOString(),
+                }
+              ]);
+            }
+            // Reset streaming state
+            chatStreaming.set(false);
+            chatStreamingMessage.set('');
+            chatStreamingMessageId.set(null);
+            console.log('[DEBUG] Streaming state reset.');
+          }
+        }
+      });
+
+      // Fallback for non-streaming response (only if streaming didn't complete)
+      if (response.content && !streamingCompleted && !$chatStreaming) {
+        // Check if response contains template operations and trigger refresh
+        if (detectTemplateOperations(response.content)) {
+          triggerPreviewRefresh();
+        }
+        
+        chatMessages.update(messages => [
+          ...messages,
+          {
+            id: crypto.randomUUID(),
+            content: response.content,
+            role: "assistant",
+            timestamp: new Date().toISOString(),
+          }
+        ]);
+      }
+
+      chatLoading.set(false);
+    } catch (error) {
+      console.error("Failed to get response from external LLM:", error);
+      
+      // More specific error messages
+      const errorMsg = error instanceof Error ? error.message : "Unknown error occurred";
+      if (errorMsg.includes("API key") || errorMsg.includes("not enabled")) {
+        errorMessage = errorMsg;
+      } else if (errorMsg.includes("not configured")) {
+        errorMessage = `Provider ${getProviderKey($selectedModel.provider)} is not configured in the system.`;
+      } else if (errorMsg.includes("Failed to fetch") || errorMsg.includes("CORS")) {
+        errorMessage = "Network error. Please restart the development server and try again.";
+      } else if (errorMsg.includes("anthropic-dangerous-direct-browser-access")) {
+        errorMessage = "Claude API security header issue. This should be fixed automatically - please try again.";
+      } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+        errorMessage = `Invalid API key for ${$selectedModel.provider}. Please check your VITE_CLAUDE_API_KEY in the .env file.`;
+      } else if (errorMsg.includes("429") || errorMsg.includes("rate limit")) {
+        errorMessage = "Rate limit exceeded. Please try again later.";
+      } else if (errorMsg.includes("529") || errorMsg.includes("Overloaded")) {
+        errorMessage = "Claude servers are currently overloaded. Please try again in a few minutes.";
+      } else {
+        errorMessage = `Failed to get response: ${errorMsg}`;
+      }
+      
+      setTimeout(() => errorMessage = "", 8000);
       chatLoading.set(false);
     }
   }
@@ -303,7 +695,7 @@
     <textarea
       bind:this={textArea}
       bind:value={$chatInput}
-      {placeholder}
+      placeholder={dynamicPlaceholder}
       maxlength={maxLength}
       class={cn(
         "w-full min-h-[60px] max-h-[200px] p-4 pr-20 text-sm",

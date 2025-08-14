@@ -18,12 +18,26 @@ TODO: For full two-way URL sync with cross-origin iframes, add this script to th
 -->
 <script lang="ts">
 import { RefreshCw } from 'lucide-svelte';
-import { previewUrl, previewLoading, showCodeView, deviceMode } from '$lib/stores';
+import { previewUrl, previewLoading, showCodeView, deviceMode, templateUpdateTrigger } from '$lib/stores';
 import { previewIframeUrl } from '$lib/stores/previewIframeUrl';
 import { cn } from '$lib/utils';
 
 // Keep previewIframeUrl in sync with previewUrl by default
 $: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
+
+// Refresh iframe when template updates are detected
+let iframeElement: HTMLIFrameElement;
+$: if ($templateUpdateTrigger > 0 && iframeElement) {
+	console.log('🔄 Refreshing preview iframe due to template update');
+	// Force iframe refresh by reloading its content
+	const currentSrc = iframeElement.src;
+	if (currentSrc) {
+		// Add timestamp to force refresh and avoid cache
+		const url = new URL(currentSrc);
+		url.searchParams.set('_refresh', Date.now().toString());
+		iframeElement.src = url.toString();
+	}
+}
 
 
 	$: containerClass = cn(
@@ -106,7 +120,6 @@ $: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
 			].join('; ');
 		}
 		// Other device modes
-		const dpiZoom = config.pixelRatio > 1 ? 1 / config.pixelRatio : 1;
 		const styles = [
 			`width: ${config.width}px`,
 			`height: ${config.height}px`,
@@ -223,6 +236,7 @@ $: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
 							</div>
 						{:else}
 <iframe
+	bind:this={iframeElement}
 	id="preview-iframe"
 	src={$previewIframeUrl || $previewUrl}
 	class="w-full h-full border-0 rounded-lg"
