@@ -34,6 +34,9 @@
   // Test connection status
   let testingConnection = false;
   let connectionStatus: Record<string, 'success' | 'error' | 'idle'> = {};
+  
+  // Auto-allow tools setting
+  let autoAllowTools = llmService.getAutoAllowToolsSetting();
 
   function closeModal() {
     isOpen = false;
@@ -90,6 +93,9 @@
     if (claudeApiKey) saveApiKey('claude', claudeApiKey);
     if (geminiApiKey) saveApiKey('gemini', geminiApiKey);
     if (deepseekApiKey) saveApiKey('deepseek', deepseekApiKey);
+    
+    // Save auto-allow tools setting
+    llmService.setAutoAllowTools(autoAllowTools);
     
     closeModal();
   }
@@ -217,6 +223,29 @@
                       min="100"
                       max="100000"
                     />
+                  </div>
+                </div>
+                
+                <!-- Tool Execution Settings -->
+                <div class="mt-6 pt-6 border-t border-base-300">
+                  <h5 class="font-semibold mb-4 flex items-center gap-2">
+                    <Zap class="w-4 h-4" />
+                    Tool Execution
+                  </h5>
+                  <div class="form-control">
+                    <label class="label cursor-pointer">
+                      <span class="label-text">
+                        <span>Auto-allow tool execution (≤20 tools)</span>
+                        <div class="text-xs text-base-content/60 mt-1">
+                          When enabled, automatically execute up to 20 MCP tools without asking for permission
+                        </div>
+                      </span>
+                      <input 
+                        type="checkbox" 
+                        class="toggle toggle-primary" 
+                        bind:checked={autoAllowTools}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>

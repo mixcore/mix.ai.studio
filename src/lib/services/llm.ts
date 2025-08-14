@@ -193,6 +193,103 @@ export class LLMService {
     };
   }
 
+  // Get auto-allow setting from localStorage
+  private getAutoAllowSetting(): boolean {
+    try {
+      const setting = localStorage.getItem('llm_auto_allow_tools');
+      return setting === 'true';
+    } catch {
+      return false; // Default to requiring approval
+    }
+  }
+
+  // Set auto-allow setting
+  setAutoAllowTools(enabled: boolean): void {
+    try {
+      localStorage.setItem('llm_auto_allow_tools', enabled.toString());
+      console.log(`🔧 Auto-allow tools setting: ${enabled}`);
+    } catch (error) {
+      console.warn('Failed to save auto-allow setting:', error);
+    }
+  }
+
+  // Request user approval for tool execution
+  private async requestUserApproval(toolCalls: Array<{ id: string; type: string; function: { name: string; arguments: string } }>): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Create modal dialog
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-base-100 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <h3 class="text-lg font-semibold mb-4">🔧 Tool Execution Request</h3>
+          <div class="mb-4">
+            <p class="text-sm text-base-content/70 mb-3">
+              The AI wants to execute ${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''}:
+            </p>
+            <div class="bg-base-200 rounded p-3 max-h-32 overflow-y-auto">
+              ${toolCalls.map(tc => {
+                const args = JSON.parse(tc.function.arguments);
+                const argSummary = Object.keys(args).length > 0 
+                  ? `(${Object.keys(args).slice(0, 2).join(', ')}${Object.keys(args).length > 2 ? '...' : ''})`
+                  : '';
+                return `<div class="text-xs font-mono mb-1">• ${tc.function.name}${argSummary}</div>`;
+              }).join('')}
+            </div>
+          </div>
+          
+          <div class="flex items-center mb-4">
+            <label class="flex items-center cursor-pointer">
+              <input type="checkbox" id="autoAllowCheckbox" class="checkbox checkbox-primary checkbox-sm mr-2">
+              <span class="text-sm">Auto-allow tool execution (≤20 tools)</span>
+            </label>
+          </div>
+          
+          <div class="flex gap-2 justify-end">
+            <button id="cancelBtn" class="btn btn-ghost btn-sm">Cancel</button>
+            <button id="allowBtn" class="btn btn-primary btn-sm">Allow Execution</button>
+          </div>
+        </div>
+      `;
+
+      // Add event listeners
+      const cancelBtn = modal.querySelector('#cancelBtn') as HTMLButtonElement;
+      const allowBtn = modal.querySelector('#allowBtn') as HTMLButtonElement;
+      const autoAllowCheckbox = modal.querySelector('#autoAllowCheckbox') as HTMLInputElement;
+
+      // Set current auto-allow state
+      autoAllowCheckbox.checked = this.getAutoAllowSetting();
+
+      cancelBtn.onclick = () => {
+        document.body.removeChild(modal);
+        resolve(false);
+      };
+
+      allowBtn.onclick = () => {
+        // Save auto-allow setting
+        this.setAutoAllowTools(autoAllowCheckbox.checked);
+        
+        document.body.removeChild(modal);
+        resolve(true);
+      };
+
+      // Close on escape key
+      const handleKeydown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          document.body.removeChild(modal);
+          document.removeEventListener('keydown', handleKeydown);
+          resolve(false);
+        }
+      };
+      document.addEventListener('keydown', handleKeydown);
+
+      // Add to DOM
+      document.body.appendChild(modal);
+      
+      // Focus the allow button
+      allowBtn.focus();
+    });
+  }
+
   // Initialize MCP connections
   private async initializeMCPConnections() {
     for (const [name, connection] of Object.entries(this.config.mcpConnections)) {
@@ -459,6 +556,26 @@ export class LLMService {
     
     console.log(`🔧 Processing ${response.toolCalls.length} tool calls:`, response.toolCalls.map(tc => tc.function.name));
 
+    // Check if user approval is needed
+    const autoAllowEnabled = this.getAutoAllowSetting();
+    const toolCount = response.toolCalls.length;
+    const needsApproval = !autoAllowEnabled || toolCount > 20;
+
+    if (needsApproval) {
+      const approved = await this.requestUserApproval(response.toolCalls);
+      if (!approved) {
+        console.log('🚫 Tool execution cancelled by user');
+        return { 
+          messages: [...messages, {
+            role: 'assistant' as const,
+            content: 'Tool execution was cancelled by the user.'
+          }]
+        };
+      }
+    } else {
+      console.log(`🔧 Auto-allowing ${toolCount} tool calls (≤20 and auto-allow enabled)`);
+    }
+
     // Add assistant message with tool calls
     const updatedMessages = [...messages, {
       role: 'assistant' as const,
@@ -470,19 +587,28 @@ export class LLMService {
     const isClaudeProvider = options.provider === 'claude';
     const toolResults: any[] = [];
 
-    console.log(`🔧 Starting tool execution for ${response.toolCalls.length} tools...`);
+    console.log(`🔧 Starting sequential tool execution for ${response.toolCalls.length} tools...`);
 
-    // Execute each tool call
+    // Execute each tool call sequentially (one at a time)
     for (let i = 0; i < response.toolCalls.length; i++) {
       const toolCall = response.toolCalls[i];
       console.log(`🔧 Executing tool ${i + 1}/${response.toolCalls.length}: ${toolCall.function.name}`);
+      console.log(`🔧 Waiting for previous tool to complete before starting...`);
       
       try {
         const args = JSON.parse(toolCall.function.arguments);
         console.log(`🔧 Tool arguments:`, args);
         
+        // Execute tool and wait for completion
+        console.log(`🔧 Starting execution of ${toolCall.function.name}...`);
         const result = await this.executeMCPTool(toolCall.function.name, args);
-        console.log(`✅ Tool ${toolCall.function.name} executed successfully:`, result);
+        console.log(`✅ Tool ${toolCall.function.name} completed successfully:`, result);
+        
+        // Add a small delay to respect rate limits
+        if (i < response.toolCalls.length - 1) {
+          console.log(`🔧 Adding 500ms delay before next tool call...`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
         if (isClaudeProvider) {
           // Collect tool results for Claude
@@ -1044,6 +1170,11 @@ export class LLMService {
   // Get MCP connections
   getMCPConnections(): Record<string, MCPConnection> {
     return { ...this.config.mcpConnections };
+  }
+
+  // Get auto-allow setting (public method)
+  getAutoAllowToolsSetting(): boolean {
+    return this.getAutoAllowSetting();
   }
 
   // Add MCP connection
