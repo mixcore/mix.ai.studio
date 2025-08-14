@@ -120,7 +120,6 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 			].join('; ');
 		}
 		// Other device modes
-		const dpiZoom = config.pixelRatio > 1 ? 1 / config.pixelRatio : 1;
 		const styles = [
 			`width: ${config.width}px`,
 			`height: ${config.height}px`,

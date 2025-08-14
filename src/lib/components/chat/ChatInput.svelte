@@ -408,9 +408,17 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
         useMCPTools: true,  // Enable MCP tools for external LLMs
         stream: true,       // Enable streaming for external LLMs
         onChunk: (chunk: string, isComplete: boolean) => {
+          console.log('🔄 Streaming chunk received:', { 
+            chunkLength: chunk.length, 
+            isComplete, 
+            streamingState: $chatStreaming,
+            currentMessageLength: $chatStreamingMessage.length 
+          });
+          
           if (isComplete) {
             // Streaming complete - add final message and reset streaming state
             const finalMessage = $chatStreamingMessage;
+            console.log('✅ Streaming complete. Final message length:', finalMessage.length);
             
             if (finalMessage && !streamingCompleted) {
               streamingCompleted = true;
@@ -436,8 +444,12 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
             chatStreamingMessage.set('');
             chatStreamingMessageId.set(null);
           } else {
-            // Accumulate streaming chunk
-            chatStreamingMessage.update((current: string) => current + chunk);
+            // Accumulate streaming chunk and display in real-time
+            chatStreamingMessage.update((current: string) => {
+              const newContent = current + chunk;
+              console.log('📝 Updated streaming message length:', newContent.length);
+              return newContent;
+            });
           }
         }
       });

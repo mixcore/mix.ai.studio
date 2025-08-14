@@ -177,6 +177,15 @@
     }
   });
 
+  // Debug streaming state
+  $: if ($chatStreaming || $chatStreamingMessage) {
+    console.log('📺 ChatPanel - Streaming state:', {
+      chatStreaming: $chatStreaming,
+      streamingMessageLength: $chatStreamingMessage.length,
+      streamingMessageId: $chatStreamingMessageId
+    });
+  }
+
   // Optimized smooth scrolling - for new messages and streaming updates
   $: if (chatContainer && ($chatMessages.length > previousMessageCount || $chatStreamingMessage)) {
     if ($chatMessages.length > previousMessageCount) {

@@ -23,6 +23,9 @@ import type {
   DatabaseOperationResult
 } from '$lib/javascript-sdk/packages/database/src/types';
 
+// Re-export types for external use
+export type { TableInfo, DatabaseStats };
+
 import { MixDbClient, createMixDbClient } from '$lib/javascript-sdk/packages/database/src/mix-db-client';
 import { ApiService } from '$lib/javascript-sdk/packages/api/dist';
 
