@@ -7,13 +7,25 @@
  * - Google Gemini (Gemini Pro, Gemini Flash)
  * - DeepSeek (DeepSeek Chat, DeepSeek Coder)
  * 
- * Integrates with MCP (Model Context Protocol) Template for enhanced functionality
+ * Integrates with MCP (Model Context Protocol) for enhanced functionality
  */
 
+import { mcpService } from './mcp';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
 export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   metadata?: Record<string, any>;
+  toolCallId?: string;
+  toolCalls?: Array<{
+    id: string;
+    type: 'function';
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
 }
 
 export interface LLMResponse {
@@ -25,6 +37,14 @@ export interface LLMResponse {
     total_tokens: number;
   };
   metadata?: Record<string, any>;
+  toolCalls?: Array<{
+    id: string;
+    type: 'function';
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
 }
 
 export interface LLMProvider {
@@ -259,7 +279,7 @@ export class LLMService {
     console.log(`Template from ${serverName}:`, template);
   }
 
-  // Send message to LLM
+  // Send message to LLM with MCP tool support
   async sendMessage(
     messages: LLMMessage[],
     options: {
@@ -268,6 +288,7 @@ export class LLMService {
       maxTokens?: number;
       temperature?: number;
       stream?: boolean;
+      useMCPTools?: boolean;
     } = {}
   ): Promise<LLMResponse> {
     const provider = options.provider || this.config.defaultProvider;
@@ -278,37 +299,170 @@ export class LLMService {
       throw new Error(`Provider ${provider} is not enabled`);
     }
 
+    // Get available MCP tools if enabled
+    let tools: Tool[] = [];
+    if (options.useMCPTools !== false) {
+      tools = this.getAvailableMCPTools();
+    }
+
+    // Add tools to options for providers that support them
+    const enhancedOptions = { ...options, tools };
+
     switch (provider) {
       case 'openai':
-        return this.sendToOpenAI(messages, model, options);
+        return this.sendToOpenAI(messages, model, enhancedOptions);
       case 'claude':
-        return this.sendToClaude(messages, model, options);
+        return this.sendToClaude(messages, model, enhancedOptions);
       case 'gemini':
-        return this.sendToGemini(messages, model, options);
+        return this.sendToGemini(messages, model, enhancedOptions);
       case 'deepseek':
-        return this.sendToDeepSeek(messages, model, options);
+        return this.sendToDeepSeek(messages, model, enhancedOptions);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
+  }
+
+  // Get available MCP tools
+  private getAvailableMCPTools(): Tool[] {
+    const allTools = mcpService.getAllTools();
+    return allTools.map(({ tool }) => ({
+      ...tool,
+      // Add server information to tool name for disambiguation
+      name: tool.name
+    }));
+  }
+
+  // Execute MCP tool call
+  async executeMCPTool(toolName: string, args: Record<string, unknown>): Promise<string> {
+    const allTools = mcpService.getAllTools();
+    const toolInfo = allTools.find(({ tool }) => tool.name === toolName);
+    
+    if (!toolInfo) {
+      throw new Error(`Tool ${toolName} not found`);
+    }
+
+    try {
+      const result = await mcpService.callTool(toolInfo.serverId, toolName, args);
+      
+      // Format result for LLM
+      if (result.content) {
+        return Array.isArray(result.content) 
+          ? result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\n')
+          : typeof result.content === 'string' 
+            ? result.content 
+            : JSON.stringify(result.content);
+      }
+      
+      return 'Tool executed successfully';
+    } catch (error) {
+      throw new Error(`Failed to execute tool ${toolName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Process tool calls in conversation
+  async processToolCalls(
+    messages: LLMMessage[],
+    response: LLMResponse,
+    options: any = {}
+  ): Promise<{ messages: LLMMessage[]; finalResponse?: LLMResponse }> {
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      return { messages };
+    }
+
+    // Add assistant message with tool calls
+    const updatedMessages = [...messages, {
+      role: 'assistant' as const,
+      content: response.content || '',
+      toolCalls: response.toolCalls
+    }];
+
+    // Execute each tool call
+    for (const toolCall of response.toolCalls) {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        const result = await this.executeMCPTool(toolCall.function.name, args);
+        
+        // Add tool result message
+        updatedMessages.push({
+          role: 'tool' as const,
+          content: result,
+          toolCallId: toolCall.id
+        });
+      } catch (error) {
+        // Add error result
+        updatedMessages.push({
+          role: 'tool' as const,
+          content: `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          toolCallId: toolCall.id
+        });
+      }
+    }
+
+    // Send updated conversation back to LLM for final response
+    const finalResponse = await this.sendMessage(updatedMessages, options);
+    
+    return { 
+      messages: [...updatedMessages, {
+        role: 'assistant' as const,
+        content: finalResponse.content
+      }],
+      finalResponse
+    };
   }
 
   // OpenAI API integration
   private async sendToOpenAI(messages: LLMMessage[], model: string, options: any): Promise<LLMResponse> {
     const provider = this.config.providers.openai;
     
+    // Convert messages to OpenAI format
+    const openaiMessages = messages.map(m => {
+      const message: any = { role: m.role, content: m.content };
+      
+      if (m.toolCalls) {
+        message.tool_calls = m.toolCalls.map(tc => ({
+          id: tc.id,
+          type: tc.type,
+          function: tc.function
+        }));
+      }
+      
+      if (m.toolCallId) {
+        message.tool_call_id = m.toolCallId;
+      }
+      
+      return message;
+    });
+
+    // Convert MCP tools to OpenAI format
+    const tools = options.tools?.map((tool: Tool) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema
+      }
+    })) || [];
+    
+    const requestBody: any = {
+      model,
+      messages: openaiMessages,
+      max_tokens: options.maxTokens || this.config.maxTokens,
+      temperature: options.temperature || this.config.temperature,
+      stream: options.stream || false
+    };
+
+    if (tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = 'auto';
+    }
+
     const response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${provider.apiKey}`
       },
-      body: JSON.stringify({
-        model,
-        messages: messages.map(m => ({ role: m.role, content: m.content })),
-        max_tokens: options.maxTokens || this.config.maxTokens,
-        temperature: options.temperature || this.config.temperature,
-        stream: options.stream || false
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -316,11 +470,17 @@ export class LLMService {
     }
 
     const data = await response.json();
+    const message = data.choices[0].message;
     
     return {
-      content: data.choices[0].message.content,
+      content: message.content || '',
       model: data.model,
-      usage: data.usage
+      usage: data.usage,
+      toolCalls: message.tool_calls?.map((tc: any) => ({
+        id: tc.id,
+        type: tc.type,
+        function: tc.function
+      }))
     };
   }
 

@@ -13,9 +13,11 @@
 		X,
 		ChevronDown,
 		Eye,
-		EyeOff
+		EyeOff,
+		Network
 	} from 'lucide-svelte';
 	import { createEventDispatcher } from 'svelte';
+	import MCPServerManager from './MCPServerManager.svelte';
 
 	export let open = false;
 
@@ -39,7 +41,8 @@
 		{ id: 'account', label: 'Account Name', icon: User, section: 'Account' },
 		{ id: 'labs', label: 'Labs', icon: FlaskConical, section: 'Account' },
 		{ id: 'mixdb', label: 'Mix Database', icon: Database, section: 'Integrations' },
-		{ id: 'github', label: 'GitHub', icon: Github, section: 'Integrations' }
+		{ id: 'github', label: 'GitHub', icon: Github, section: 'Integrations' },
+		{ id: 'mcp', label: 'MCP Servers', icon: Network, section: 'Integrations' }
 	];
 
 	const sections = ['Project', 'Workspace', 'Account', 'Integrations'];
@@ -129,7 +132,19 @@
 		<div class="flex-1 flex flex-col">
 			<!-- Content area -->
 			<div class="flex-1 overflow-y-auto p-6 md:p-10 pt-20 md:pt-6" id="settings-content" role="tabpanel">
-					{#if activeTab === 'project'}
+					{#if activeTab === 'mcp'}
+						<!-- MCP Servers Content -->
+						<div class="max-w-4xl">
+							<div class="hidden md:block mb-6">
+								<h3 class="text-lg font-medium mb-2">MCP Servers</h3>
+								<p class="text-sm text-base-content/60">
+									Manage Model Context Protocol servers to extend AI capabilities with custom tools and resources.
+								</p>
+							</div>
+
+							<MCPServerManager />
+						</div>
+					{:else if activeTab === 'project'}
 						<!-- Project Settings Content -->
 						<div class="max-w-4xl">
 							<div class="hidden md:block mb-6">
