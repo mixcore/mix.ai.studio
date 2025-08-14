@@ -198,9 +198,27 @@
           {$mcpTools.length} tools from {$mcpConnections.filter(c => c.connected).length} servers
         </div>
         {#if $mcpTools.length > 0}
-          <span class="text-xs text-base-content/40">
-            ({$mcpTools.map(t => t.tool.name).join(', ')})
-          </span>
+          <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-xs btn-ghost text-xs text-base-content/60 hover:text-base-content">
+              View Tools
+            </div>
+            <div tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-80 p-2 shadow-lg max-h-60 overflow-y-auto">
+              <div class="text-xs font-medium text-base-content/80 mb-2">Available MCP Tools ({$mcpTools.length}):</div>
+              <div class="grid grid-cols-2 gap-1">
+                {#each $mcpTools as { serverName, tool }}
+                  <div class="tooltip tooltip-top" data-tip={tool.description}>
+                    <div class="badge badge-xs badge-outline text-xs p-2 cursor-help">
+                      {tool.name}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+              <div class="divider my-2"></div>
+              <div class="text-xs text-base-content/60">
+                Connected servers: {[...new Set($mcpTools.map(t => t.serverName))].join(', ')}
+              </div>
+            </div>
+          </div>
         {/if}
       </div>
     {/if}
