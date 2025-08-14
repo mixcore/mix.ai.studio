@@ -59,10 +59,10 @@ export const availableModels: LLMModel[] = [
   { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic' },
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic' },
   { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7', provider: 'Anthropic' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google' },
   { id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
-  { id: 'llama3-8b', name: 'LLaMA3 8B', provider: 'Groq' },
   { id: 'mixcore-streaming', name: 'Mixcore Streaming API', provider: 'Mixcore' }
-];;;
+];;;;
 export const selectedModel = writable<LLMModel>(availableModels.find(m => m.provider === 'Mixcore') || availableModels[0]);;
 
 export const previewUrl = writable('');

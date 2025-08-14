@@ -135,13 +135,46 @@
     }
   }
 
+  // Map display provider names to internal service keys
+  function getProviderKey(displayProvider: string): string {
+    const providerMap: Record<string, string> = {
+      'OpenAI': 'openai',
+      'Anthropic': 'claude',
+      'Google': 'gemini',
+      'DeepSeek': 'deepseek',
+      'Groq': 'groq',
+      'Mistral': 'mistral'
+    };
+    return providerMap[displayProvider] || displayProvider.toLowerCase();
+  }
+
   // Handle external LLM message sending
   async function sendExternalLLMMessage(message: string) {
     try {
+      const providerKey = getProviderKey($selectedModel.provider);
+      console.log('Sending message to provider:', providerKey, 'model:', $selectedModel.id);
+      
+      // Check if provider is configured and enabled
+      const providers = llmService.getProviders();
+      const providerConfig = providers[providerKey];
+      
+      if (!providerConfig) {
+        throw new Error(`Provider ${providerKey} is not configured`);
+      }
+      
+      if (!providerConfig.isEnabled) {
+        throw new Error(`Provider ${providerKey} is not enabled. Please check your API key configuration.`);
+      }
+      
+      if (!providerConfig.apiKey) {
+        const envKeyName = providerKey === 'claude' ? 'VITE_CLAUDE_API_KEY' : `VITE_${providerKey.toUpperCase()}_API_KEY`;
+        throw new Error(`API key is missing for provider ${providerKey}. Please add ${envKeyName} to your environment.`);
+      }
+      
       const response = await llmService.sendMessage([
         { role: 'user', content: message }
       ], {
-        provider: $selectedModel.provider.toLowerCase() as any,
+        provider: providerKey,
         model: $selectedModel.id
       });
 
@@ -161,8 +194,18 @@
       chatLoading.set(false);
     } catch (error) {
       console.error("Failed to get response from external LLM:", error);
-      errorMessage = "Failed to get response. Please check your API configuration.";
-      setTimeout(() => errorMessage = "", 5000);
+      
+      // More specific error messages
+      const errorMsg = error instanceof Error ? error.message : "Unknown error occurred";
+      if (errorMsg.includes("API key") || errorMsg.includes("not enabled")) {
+        errorMessage = errorMsg;
+      } else if (errorMsg.includes("not configured")) {
+        errorMessage = `Provider ${getProviderKey($selectedModel.provider)} is not configured in the system.`;
+      } else {
+        errorMessage = "Failed to get response. Please check your API configuration.";
+      }
+      
+      setTimeout(() => errorMessage = "", 8000);
       chatLoading.set(false);
     }
   }

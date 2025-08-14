@@ -175,7 +175,16 @@
           class="select select-xs select-bordered" 
           bind:value={$selectedModel}
         >
-          {#each availableModels.filter(m => m.provider !== 'Mixcore') as model}
+          {#each availableModels.filter(m => {
+            if (m.provider === 'Mixcore') return false;
+            const providers = llmService.getProviders();
+            const providerKey = m.provider === 'OpenAI' ? 'openai' : 
+                             m.provider === 'Anthropic' ? 'claude' :
+                             m.provider === 'Google' ? 'gemini' :
+                             m.provider === 'DeepSeek' ? 'deepseek' :
+                             m.provider.toLowerCase();
+            return providers[providerKey]?.isEnabled;
+          }) as model}
             <option value={model}>{model.name} ({model.provider})</option>
           {/each}
         </select>
