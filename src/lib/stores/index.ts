@@ -6,8 +6,41 @@ export { mixcoreService };
 import { createLLMService, LLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
 // Initialize services
+// Initialize services
 // Note: The real SDK client is now handled through mixcoreService
-export const llmService = createLLMService();
+// Create a safe stub during server-side rendering so module imports don't
+// instantiate browser-only logic (EventSource, localStorage, document, etc.).
+let _llmService: LLMService | null = null;
+if (typeof window !== 'undefined') {
+  // In the browser, create the real service which may use DOM APIs.
+  _llmService = createLLMService();
+} else {
+  // SSR: provide a minimal stub that implements the commonly used public
+  // methods so imports and template rendering won't crash. Methods that
+  // require runtime behavior will throw if called on the server.
+  const stub: Partial<LLMService> = {
+    getProviders: () => ({} as Record<string, LLMProvider>),
+    getModels: (_provider: string) => [] as string[],
+    getMCPConnections: () => ({}),
+    getAutoAllowToolsSetting: () => false,
+    onTemplateOperation: (_cb: any) => {
+      return () => {};
+    },
+    setProvider: (_name: string, _config: Partial<LLMProvider>) => {},
+    toggleProvider: (_name: string, _enabled: boolean) => {},
+    setAutoAllowTools: (_enabled: boolean) => {},
+    addMCPConnection: (_name: string, _conn: any) => {},
+    removeMCPConnection: (_name: string) => {},
+    // Async operations that should not run during SSR will throw if invoked.
+    sendMessage: async () => { throw new Error('LLMService unavailable during server-side rendering'); },
+    processToolCalls: async () => { throw new Error('LLMService unavailable during server-side rendering'); },
+    executeMCPTool: async () => { throw new Error('LLMService unavailable during server-side rendering'); }
+  };
+
+  _llmService = stub as unknown as LLMService;
+}
+
+export const llmService = _llmService as LLMService;
 export const databaseService = createDatabaseService();
 
 export const user = writable<User | null>(null);
