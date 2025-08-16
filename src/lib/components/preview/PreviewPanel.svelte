@@ -22,6 +22,9 @@ import { previewUrl, previewLoading, showCodeView, deviceMode, templateUpdateTri
 import { previewIframeUrl } from '$lib/stores/previewIframeUrl';
 import { cn } from '$lib/utils';
 
+// Map to hold cleanup functions per iframe element to avoid touching cross-origin frames
+const iframeCleanup = new WeakMap<HTMLIFrameElement, () => void>();
+
 // Keep previewIframeUrl in sync with previewUrl by default
 $: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
 
@@ -63,7 +66,7 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 	})();
 
 	// Device-specific DPI and pixel ratio simulation
-	$: deviceConfig = (() => {
+		$: deviceConfig = (() => {
 		if ($deviceMode === 'mobile') {
 			return {
 				width: 375,
@@ -89,11 +92,12 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 				zoom: 1
 			};
 		} else if ($deviceMode === 'responsive') {
-			// Use 100% for responsive mode
+			// Use 100% for responsive mode. Guard access to window for SSR.
+			const pixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 			return {
 				width: '100%',
 				height: '100%',
-				pixelRatio: window.devicePixelRatio || 1,
+				pixelRatio,
 				dpi: 96,
 				zoom: 1
 			};
@@ -267,21 +271,39 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 			}
 		};
 		updateUrl();
-		// Remove previous listeners if any
-		if ((win as any).__mixcore_urlbar_cleanup) {
-			(win as any).__mixcore_urlbar_cleanup();
+		// Remove previous cleanup attached to this iframe (kept in parent only)
+		const previousCleanup = iframeCleanup.get(iframe);
+		if (previousCleanup) {
+			try { previousCleanup(); } catch (e) { /* ignore */ }
+			iframeCleanup.delete(iframe);
 		}
-		// Listen for navigation events inside the iframe
+		// Try to add listeners to iframe window only if same-origin
+		let sameOrigin = true;
+		try {
+			// Accessing location will throw for cross-origin iframes
+			void win.location.href;
+		} catch (e) {
+			sameOrigin = false;
+		}
 		const hashListener = () => updateUrl();
 		const popListener = () => updateUrl();
-		win.addEventListener('hashchange', hashListener);
-		win.addEventListener('popstate', popListener);
-		// Store cleanup on window for next reload
-		(win as any).__mixcore_urlbar_cleanup = () => {
-			win.removeEventListener('hashchange', hashListener);
-			win.removeEventListener('popstate', popListener);
-			delete (win as any).__mixcore_urlbar_cleanup;
-		};
+		if (sameOrigin) {
+			try {
+				win.addEventListener('hashchange', hashListener);
+				win.addEventListener('popstate', popListener);
+				const cleanup = () => {
+					try {
+						win.removeEventListener('hashchange', hashListener);
+						win.removeEventListener('popstate', popListener);
+					} catch (e) { /* ignore */ }
+				};
+				iframeCleanup.set(iframe, cleanup);
+			} catch (e) {
+				// If attaching listeners fails, rely on postMessage fallback
+			}
+		} else {
+			// Cross-origin iframe: rely on postMessage from iframe for navigation updates
+		}
 		// Listen for postMessage from iframe for SPA navigation
 		// Always remove previous message listener before adding a new one
 		if ((window as any).__mixcore_urlbar_global_cleanup_message) {
