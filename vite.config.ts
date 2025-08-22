@@ -1,20 +1,46 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, loadEnv } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export default defineConfig(({ mode }) => {
 	// Load environment variables from .env files for the current mode
 	const env = loadEnv(mode, process.cwd(), '');
 
+	// Detect local certs under ./certs
+	const certDir = path.resolve(process.cwd(), 'certs');
+	const candidates = [
+		{ cert: path.join(certDir, 'localhost.pem'), key: path.join(certDir, 'localhost-key.pem') },
+		{ cert: path.join(certDir, 'cert.pem'), key: path.join(certDir, 'key.pem') }
+	];
+
+	let httpsConfig: any = {};
+	let useBasicSsl = true;
+	for (const c of candidates) {
+		if (fs.existsSync(c.cert) && fs.existsSync(c.key)) {
+			httpsConfig = {
+				cert: fs.readFileSync(c.cert),
+				key: fs.readFileSync(c.key)
+			};
+			useBasicSsl = false;
+			console.log('[vite] Using TLS certs from', c.cert);
+			break;
+		}
+	}
+
+	if (useBasicSsl) {
+		console.log('[vite] No local certs found in ./certs — falling back to plugin-basic-ssl self-signed cert (browser will warn unless trusted)');
+	}
+
+	const plugins: any[] = [sveltekit()];
+	if (useBasicSsl) plugins.push(basicSsl());
+
 	return {
-		plugins: [
-			sveltekit(),
-			// Enable HTTPS with self-signed certificates for development
-			basicSsl()
-		],
+		plugins,
 		server: {
-			// Enable HTTPS
-			https: {},
+			// Enable HTTPS (either provided certs or plugin-basic-ssl)
+			https: httpsConfig,
 			// Configure host and port
 			host: '0.0.0.0', // Allow external connections
 			port: 5173,
