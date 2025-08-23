@@ -16,9 +16,16 @@
   import { mcpTools, mcpConnections } from "$lib/stores/mcp";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, createEventDispatcher } from "svelte";
   import { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
   import type { SignalRMessage } from "$lib/javascript-sdk/packages/realtime/src";
+  import type { PageContent } from "$lib/models";
+
+  // Props
+  export let pages: PageContent[] = [];
+  export let activePage: PageContent | null = null;
+
+  const dispatch = createEventDispatcher();
 
   let chatContainer: HTMLDivElement;
   let chatService: ChatService | null = null;
@@ -30,6 +37,26 @@
   // Mode selection logic
   let currentMode: "mixcore" | "external" = "mixcore";
   $: currentMode = $llmMode;
+
+  // Log when activePage changes for debugging
+  $: if (activePage) {
+    console.log('💻 ChatPanel: activePage updated:', {
+      id: activePage.id,
+      title: activePage.title,
+      seoName: activePage.seoName,
+      templateId: activePage.templateId,
+      layoutId: activePage.layoutId,
+      status: activePage.status,
+      detailUrl: activePage.detailUrl
+    });
+  } else {
+    console.log('💻 ChatPanel: activePage is null/undefined');
+  }
+
+  // Function to handle page selection
+  function handlePageSelect(page: PageContent) {
+    dispatch('pageSelect', page);
+  }
 
   // Template operation detection function
   function detectTemplateOperations(responseContent: string): boolean {
@@ -275,8 +302,8 @@
             >
               View Tools
             </div>
-            <ul
-              tabindex="0"
+            <div
+              role="listbox"
               class="dropdown-content menu bg-base-200 rounded-box z-[1] w-80 p-2 shadow-lg max-h-60 overflow-y-auto"
             >
               <div class="text-xs font-medium text-base-content/80 mb-2">
@@ -299,7 +326,18 @@
                   ...new Set($mcpTools.map((t) => t.serverName)),
                 ].join(", ")}
               </div>
-            </ul>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- Pages Section -->
+    {#if pages.length > 0}
+      <div class="mt-3 pt-3 border-t border-base-300">
+        {#if activePage}
+          <div class="mt-1 text-xs text-base-content/50">
+            SEO: {activePage.seoName || 'N/A'} | Status: {activePage.status || 'N/A'}
           </div>
         {/if}
       </div>
@@ -366,6 +404,6 @@
 
   <!-- Chat Input -->
   <div class="p-4 border-t border-base-300">
-    <ChatInput {chatService} {currentMode} />
+    <ChatInput {chatService} {currentMode} {activePage} />
   </div>
 </div>

@@ -16,18 +16,34 @@
   import { mcpTools } from "$lib/stores/mcp";
   import { cn } from "$lib/utils";
   import type { ChatService } from "$lib/javascript-sdk/packages/realtime/src";
+  import type { PageContent } from "$lib/models";
 
   // Props
   export let chatService: ChatService | null;
   export let currentMode: 'mixcore' | 'external' = 'mixcore';
+  export let activePage: PageContent | null = null; // Active page context for enhanced AI interactions
   export let maxLength = 4000;
-  export let placeholder = "Ask mixcore.ai to build your app...";
   
-  // Dynamic placeholder based on mode
+  // Dynamic placeholder based on mode and active page
   $: dynamicPlaceholder = currentMode === 'mixcore' 
-    ? "Ask Mixcore AI to build your app..." 
-    : `Ask ${$selectedModel?.name || 'AI'} to help you...`;
+    ? `Ask Mixcore AI to build your app${activePage ? ` (editing: ${activePage.title || activePage.seoName || 'page'}, page id: ${activePage.id}, master layout id: ${activePage.layoutId}, template id: ${activePage.templateId})` : ''}...` 
+    : `Ask ${$selectedModel?.name || 'AI'} to help you${activePage ? ` with ${activePage.title || activePage.seoName || 'page'} (page id: ${activePage.id})` : ''}...`;
   export let allowFileUpload = true;
+
+  // Log when activePage changes for debugging
+  $: if (activePage) {
+    console.log('💬 ChatInput: activePage updated:', {
+      id: activePage.id,
+      title: activePage.title,
+      seoName: activePage.seoName,
+      templateId: activePage.templateId,
+      layoutId: activePage.layoutId,
+      status: activePage.status,
+      detailUrl: activePage.detailUrl
+    });
+  } else {
+    console.log('💬 ChatInput: activePage is null/undefined');
+  }
 
   // Component state
   let textArea: HTMLTextAreaElement;
@@ -120,7 +136,7 @@
         ...messages,
         {
           id: crypto.randomUUID(),
-          content: sanitizedInput,
+          content: sanitizedInput, // Use the clean user input without context
           role: "user",
           timestamp: new Date().toISOString(),
         }
@@ -168,11 +184,24 @@
   }
 
   // Create system prompt with MCP context
-  function createMCPSystemPrompt(mcpTools: Array<{ serverId: string; serverName: string; tool: any }>): string {
+  function createMCPSystemPrompt(mcpTools: Array<{ serverId: string; serverName: string; tool: any }>, activePage: PageContent | null = null): string {
+    const activePageContext = activePage ? `
+
+## 🎯 Current Page Context
+**Active Page**: ${activePage.title || 'Untitled'}
+**SEO Name**: ${activePage.seoName || 'N/A'}
+**Page ID**: ${activePage.id || 'N/A'}
+**Status**: ${activePage.status || 'N/A'}
+**Template ID**: ${activePage.templateId || 'N/A'}
+**Layout ID**: ${activePage.layoutId || 'N/A'}
+
+You are currently working on the page "${activePage.title || activePage.seoName || 'current page'}". When the user refers to "this page", "current page", or similar, they mean this specific page. Prioritize operations and suggestions related to this page context.
+` : '';
+
     if (!mcpTools || mcpTools.length === 0) {
       return `# Mixcore AI Studio - CTO Agent
 
-You are an advanced CTO-level AI agent specializing in Mixcore CMS development and enterprise web architecture. You combine strategic technical leadership with hands-on development expertise.
+You are an advanced CTO-level AI agent specializing in Mixcore CMS development and enterprise web architecture. You combine strategic technical leadership with hands-on development expertise.${activePageContext}
 
 ## Core Identity & Approach
 - **Role**: Chief Technology Officer Agent for Mixcore AI Studio
@@ -207,7 +236,7 @@ Always provide strategic insights, architectural guidance, and production-ready 
 
     return `# Mixcore AI Studio - CTO Agent with MCP Integration
 
-You are an elite CTO-level AI agent specializing in **Mixcore CMS** development with full access to ${mcpTools.length} MCP tools from ${serverList}. You operate as a strategic technical leader combining enterprise architecture expertise with hands-on Mixcore development mastery.
+You are an elite CTO-level AI agent specializing in **Mixcore CMS** development with full access to ${mcpTools.length} MCP tools from ${serverList}. You operate as a strategic technical leader combining enterprise architecture expertise with hands-on Mixcore development mastery.${activePageContext}
 
 ## 🎯 Core Identity
 **Role**: Chief Technology Officer Agent  
@@ -418,7 +447,7 @@ You combine the strategic thinking of a CTO with the technical mastery of a seni
   console.log('[DEBUG] Streaming started, messageId:', streamingMessageId);
 
       // Create system prompt with MCP context
-      const mcpSystemPrompt = createMCPSystemPrompt($mcpTools);
+      const mcpSystemPrompt = createMCPSystemPrompt($mcpTools, activePage);
       const messages = mcpSystemPrompt 
         ? [
             { role: 'system' as const, content: mcpSystemPrompt },
