@@ -21,9 +21,71 @@ import { RefreshCw } from 'lucide-svelte';
 import { previewUrl, previewLoading, showCodeView, deviceMode, templateUpdateTrigger } from '$lib/stores';
 import { previewIframeUrl } from '$lib/stores/previewIframeUrl';
 import { cn } from '$lib/utils';
+import { createEventDispatcher } from 'svelte';
+import type { PageContent } from '$lib/models';
+
+// Props
+export let pages: PageContent[] = [];
+export let activePage: PageContent | null = null;
+
+const dispatch = createEventDispatcher();
+
+// Get the API URL from environment variables
+const MIXCORE_API_URL = import.meta.env.VITE_MIXCORE_API_URL;
+
+// Map to hold cleanup functions per iframe element to avoid touching cross-origin frames
+const iframeCleanup = new WeakMap<HTMLIFrameElement, () => void>();
 
 // Keep previewIframeUrl in sync with previewUrl by default
-$: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
+// $: if ($previewUrl && !$previewIframeUrl) previewIframeUrl.set($previewUrl);
+
+// Reactive statement to update preview URL when activePage changes
+$: if (activePage) {
+  let newPreviewUrl = '';
+  if (activePage.detailUrl) {
+    newPreviewUrl = `${MIXCORE_API_URL}${activePage.detailUrl}`;
+  } else if (activePage.seoName) {
+    newPreviewUrl = `${MIXCORE_API_URL}/${activePage.seoName}`;
+  } else {
+    newPreviewUrl = `${MIXCORE_API_URL}/page/${activePage.id}`;
+  }
+  
+  console.log('🔄 Auto-updating preview URL for active page:', newPreviewUrl);
+  previewUrl.set(newPreviewUrl);
+  previewIframeUrl.set(newPreviewUrl);
+  
+  // Also update iframe src if it's already loaded
+  if (iframeElement && iframeElement.src !== newPreviewUrl) {
+    console.log('🔄 Updating iframe src for active page change');
+    iframeElement.src = newPreviewUrl;
+  }
+}
+
+// Function to handle page selection
+function handlePageSelect(page: PageContent) {
+  console.log('🔗 PreviewPanel: Page selected, dispatching to parent:', page.title || page.seoName);
+  // Don't modify local activePage - let parent handle it and pass back via props
+  // Update preview URL based on the selected page's detailUrl, seoName, or id
+  let newPreviewUrl = '';
+  if (page.detailUrl) {
+    newPreviewUrl = `${MIXCORE_API_URL}${page.detailUrl}`;
+  } else if (page.seoName) {
+    newPreviewUrl = `${MIXCORE_API_URL}/${page.seoName}`;
+  } else {
+    newPreviewUrl = `${MIXCORE_API_URL}/page/${page.id}`;
+  }
+  
+  console.log('🔗 Setting preview URL:', newPreviewUrl);
+  previewUrl.set(newPreviewUrl);
+  previewIframeUrl.set(newPreviewUrl);
+  
+  // Force iframe refresh to the new URL
+  if (iframeElement) {
+    console.log('🔄 Forcing iframe to load new page URL');
+    iframeElement.src = newPreviewUrl;
+  }
+  dispatch('pageSelect', page);
+}
 
 // Refresh iframe when template updates are detected
 let iframeElement: HTMLIFrameElement;
@@ -63,7 +125,7 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 	})();
 
 	// Device-specific DPI and pixel ratio simulation
-	$: deviceConfig = (() => {
+		$: deviceConfig = (() => {
 		if ($deviceMode === 'mobile') {
 			return {
 				width: 375,
@@ -89,11 +151,12 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 				zoom: 1
 			};
 		} else if ($deviceMode === 'responsive') {
-			// Use 100% for responsive mode
+			// Use 100% for responsive mode. Guard access to window for SSR.
+			const pixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 			return {
 				width: '100%',
 				height: '100%',
-				pixelRatio: window.devicePixelRatio || 1,
+				pixelRatio,
 				dpi: 96,
 				zoom: 1
 			};
@@ -148,7 +211,48 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 	})();
 </script>
 
-<div class="flex flex-col h-full bg-muted/30">
+<div class="flex flex-col h-full bg-muted/30 ${pages.length}">
+	<!-- Pages Navigation Header -->
+	{#if pages.length > 0}
+		<div class="p-3 border-b border-base-300 bg-base-100">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium">Preview:</span>
+				<select
+					class="select select-sm select-bordered flex-1"
+					value={activePage?.id || ''}
+					on:change={(e) => {
+						const target = e.target as HTMLSelectElement;
+						const selectedValue = target.value;
+						console.log('🔍 Select change - raw value:', selectedValue);
+						
+						// Convert to number, handling both string and number cases
+						const selectedId = selectedValue ? parseInt(selectedValue.toString(), 10) : null;
+						console.log('🔍 Select change - parsed ID:', selectedId);
+						
+						if (selectedId && !isNaN(selectedId)) {
+							const selectedPage = pages.find(p => p.id === selectedId);
+							console.log('🔍 Select change - found page:', selectedPage);
+							if (selectedPage) {
+								console.log('📄 Page selected:', selectedPage.title || selectedPage.seoName);
+								handlePageSelect(selectedPage);
+							} else {
+								console.warn('⚠️ Page not found with ID:', selectedId);
+							}
+						} else {
+							console.warn('⚠️ Invalid page ID selected:', selectedValue);
+						}
+					}}
+				>
+					{#each pages as page}
+						<option value={page.id}>
+							{page.title || page.seoName || `Page ${page.id}`}
+						</option>
+					{/each}
+				</select>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Preview Content -->
 	<div class="flex-1 overflow-auto">
 		{#if $showCodeView}
@@ -267,21 +371,39 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 			}
 		};
 		updateUrl();
-		// Remove previous listeners if any
-		if ((win as any).__mixcore_urlbar_cleanup) {
-			(win as any).__mixcore_urlbar_cleanup();
+		// Remove previous cleanup attached to this iframe (kept in parent only)
+		const previousCleanup = iframeCleanup.get(iframe);
+		if (previousCleanup) {
+			try { previousCleanup(); } catch (e) { /* ignore */ }
+			iframeCleanup.delete(iframe);
 		}
-		// Listen for navigation events inside the iframe
+		// Try to add listeners to iframe window only if same-origin
+		let sameOrigin = true;
+		try {
+			// Accessing location will throw for cross-origin iframes
+			void win.location.href;
+		} catch (e) {
+			sameOrigin = false;
+		}
 		const hashListener = () => updateUrl();
 		const popListener = () => updateUrl();
-		win.addEventListener('hashchange', hashListener);
-		win.addEventListener('popstate', popListener);
-		// Store cleanup on window for next reload
-		(win as any).__mixcore_urlbar_cleanup = () => {
-			win.removeEventListener('hashchange', hashListener);
-			win.removeEventListener('popstate', popListener);
-			delete (win as any).__mixcore_urlbar_cleanup;
-		};
+		if (sameOrigin) {
+			try {
+				win.addEventListener('hashchange', hashListener);
+				win.addEventListener('popstate', popListener);
+				const cleanup = () => {
+					try {
+						win.removeEventListener('hashchange', hashListener);
+						win.removeEventListener('popstate', popListener);
+					} catch (e) { /* ignore */ }
+				};
+				iframeCleanup.set(iframe, cleanup);
+			} catch (e) {
+				// If attaching listeners fails, rely on postMessage fallback
+			}
+		} else {
+			// Cross-origin iframe: rely on postMessage from iframe for navigation updates
+		}
 		// Listen for postMessage from iframe for SPA navigation
 		// Always remove previous message listener before adding a new one
 		if ((window as any).__mixcore_urlbar_global_cleanup_message) {

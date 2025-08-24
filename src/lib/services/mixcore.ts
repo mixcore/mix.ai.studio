@@ -49,15 +49,18 @@ class MixcoreService {
   private accessToken: string | null = null;
 
   async initialize(): Promise<boolean> {
-    // Try to restore authentication from localStorage
+    // Try to restore authentication from localStorage (browser only)
     try {
-      const storedToken = localStorage.getItem('mixcore_access_token');
-      const storedUser = localStorage.getItem('mixcore_user');
-      
-      if (storedToken && storedUser) {
-        this.accessToken = storedToken;
-        this._currentUser = JSON.parse(storedUser);
-        return true;
+      // Check if we're running in the browser
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        const storedToken = localStorage.getItem('mixcore_access_token');
+        const storedUser = localStorage.getItem('mixcore_user');
+        
+        if (storedToken && storedUser) {
+          this.accessToken = storedToken;
+          this._currentUser = JSON.parse(storedUser);
+          return true;
+        }
       }
     } catch (error) {
       console.warn('Failed to restore auth state:', error);
@@ -91,13 +94,20 @@ class MixcoreService {
       throw new MixcoreError('API base URL is not configured', 'API_URL_MISSING');
     }
     // Helper to get the latest access token from localStorage
-    const getAccessToken = () => localStorage.getItem('mixcore_access_token');
+    const getAccessToken = () => {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        return localStorage.getItem('mixcore_access_token');
+      }
+      return null;
+    };
 
-    // Create a minimal API service implementation
-    const apiService = {
+    // Create a complete API service implementation that matches the expected interface
+    const apiService: any = {
       config: { apiBaseUrl },
       hooks: [],
-      use: () => {},
+      use: (hook: any) => {
+        // No-op implementation for hooks
+      },
       async get(endpoint: string) {
         const url = endpoint.startsWith('http') ? endpoint : `${apiBaseUrl}${endpoint}`;
         const token = getAccessToken();
@@ -174,13 +184,15 @@ class MixcoreService {
           this.accessToken = result.data.accessToken;
           this._currentUser = user;
           
-          // Persist to localStorage
-          try {
-            localStorage.setItem('mixcore_access_token', result.data.accessToken);
-            localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
-            localStorage.setItem('mixcore_user', JSON.stringify(user));
-          } catch (error) {
-            console.warn('Failed to persist auth state:', error);
+          // Persist to localStorage (browser only)
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem('mixcore_access_token', result.data.accessToken);
+              localStorage.setItem('mixcore_refresh_token', result.data.refreshToken);
+              localStorage.setItem('mixcore_user', JSON.stringify(user));
+            } catch (error) {
+              console.warn('Failed to persist auth state:', error);
+            }
           }
           
           return user;
@@ -222,13 +234,15 @@ class MixcoreService {
     this.accessToken = null;
     this._currentUser = null;
     
-    // Clear localStorage
-    try {
-      localStorage.removeItem('mixcore_access_token');
-      localStorage.removeItem('mixcore_refresh_token');
-      localStorage.removeItem('mixcore_user');
-    } catch (error) {
-      console.warn('Failed to clear auth state:', error);
+    // Clear localStorage (browser only)
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem('mixcore_access_token');
+        localStorage.removeItem('mixcore_refresh_token');
+        localStorage.removeItem('mixcore_user');
+      } catch (error) {
+        console.warn('Failed to clear auth state:', error);
+      }
     }
   }
 
@@ -246,6 +260,12 @@ class MixcoreService {
   }
 
   async refreshAuthToken(): Promise<boolean> {
+    // Check if we're in the browser before accessing localStorage
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      console.warn('Cannot refresh token: localStorage not available');
+      return false;
+    }
+    
     const refreshToken = localStorage.getItem('mixcore_refresh_token');
     if (!refreshToken) {
       console.warn('No refresh token available');

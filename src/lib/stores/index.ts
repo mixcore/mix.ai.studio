@@ -5,19 +5,59 @@ import { mixcoreService, type User, type Project, type ChatMessage } from '$lib/
 export { mixcoreService };
 import { createLLMService, LLMService, type LLMProvider } from '$lib/services/llm';
 import { createDatabaseService, type TableInfo, type DatabaseStats } from '$lib/services/database';
+import { authService, type LoginRequest, type RegisterRequest, type AuthState } from '$lib/services/auth.service';
+
+// Re-export auth service and types for external access
+export { authService, type LoginRequest, type RegisterRequest, type AuthState };
+// Initialize services
 // Initialize services
 // Note: The real SDK client is now handled through mixcoreService
-export const llmService = createLLMService();
+// Create a safe stub during server-side rendering so module imports don't
+// instantiate browser-only logic (EventSource, localStorage, document, etc.).
+let _llmService: LLMService | null = null;
+if (typeof window !== 'undefined') {
+  // In the browser, create the real service which may use DOM APIs.
+  _llmService = createLLMService();
+} else {
+  // SSR: provide a minimal stub that implements the commonly used public
+  // methods so imports and template rendering won't crash. Methods that
+  // require runtime behavior will throw if called on the server.
+  const stub: Partial<LLMService> = {
+    getProviders: () => ({} as Record<string, LLMProvider>),
+    getModels: (_provider: string) => [] as string[],
+    getMCPConnections: () => ({}),
+    getAutoAllowToolsSetting: () => false,
+    onTemplateOperation: (_cb: any) => {
+      return () => {};
+    },
+    setProvider: (_name: string, _config: Partial<LLMProvider>) => {},
+    toggleProvider: (_name: string, _enabled: boolean) => {},
+    setAutoAllowTools: (_enabled: boolean) => {},
+    addMCPConnection: (_name: string, _conn: any) => {},
+    removeMCPConnection: (_name: string) => {},
+    // Async operations that should not run during SSR will throw if invoked.
+    sendMessage: async () => { throw new Error('LLMService unavailable during server-side rendering'); },
+    processToolCalls: async () => { throw new Error('LLMService unavailable during server-side rendering'); },
+    executeMCPTool: async () => { throw new Error('LLMService unavailable during server-side rendering'); }
+  };
+
+  _llmService = stub as unknown as LLMService;
+}
+
+export const llmService = _llmService as LLMService;
 export const databaseService = createDatabaseService();
 
-export const user = writable<User | null>(null);
+// Export auth stores from AuthService
+export const user = authService.user;
+export const isAuthenticated = authService.isAuthenticated;
+export const tokenExpiry = authService.tokenExpiry;
+export const refreshInProgress = authService.isRefreshing;
+export const authError = authService.error;
+export const authState = authService.authState;
+export const isTokenExpiring = authService.isTokenExpiring;
+
 export const currentProject = writable<Project | null>(null);
 export const workspace = writable<Workspace | null>(null);
-
-// Auth-related stores
-export const tokenExpiry = writable<Date | null>(null);
-export const refreshInProgress = writable(false);
-export const authError = writable<string | null>(null);
 
 export const chatMessages = writable<ChatMessage[]>([]);
 export const chatLoading = writable(false);
@@ -85,16 +125,7 @@ export const mixcoreConnected = writable(false);
 export const projects = writable<Project[]>([]);
 
 // Derived stores
-export const isAuthenticated = derived(user, ($user) => !!$user);
 export const hasProjects = derived(projects, ($projects) => $projects.length > 0);
-
-// Auth status derived stores
-export const isTokenExpiring = derived(tokenExpiry, ($tokenExpiry) => {
-  if (!$tokenExpiry) return false;
-  const now = new Date();
-  const timeUntilExpiry = $tokenExpiry.getTime() - now.getTime();
-  return timeUntilExpiry <= 10 * 60 * 1000 && timeUntilExpiry > 0; // Expires in next 10 minutes
-});
 
 export const authStatus = derived(
   [user, refreshInProgress, authError, isTokenExpiring],
@@ -111,148 +142,57 @@ export const authStatus = derived(
 // Store actions for Mixcore integration
 export const userActions = {
   async login(email: string, password: string) {
-    try {
-      authError.set(null);
-      const mixcoreUser = await mixcoreService.login(email, password);
-      if (mixcoreUser) {
-        console.log('✅ User logged in:', mixcoreUser);
-        user.set(mixcoreUser);
-        mixcoreConnected.set(true);
-        
-        // Set token expiry (typically 1 hour from now)
-        const expiry = new Date();
-        expiry.setHours(expiry.getHours() + 1);
-        tokenExpiry.set(expiry);
-        localStorage.setItem('mixcore_token_expiry', expiry.toISOString());
-        
-        // Start token refresh monitoring
-        this.startTokenRefreshMonitoring();
-        
-        // Load projects after successful login
-        try {
-          await projectActions.loadProjects();
-        } catch (projectError) {
-          console.warn('Failed to load projects after login:', projectError);
-        }
-        
-        return { success: true };
+    const result = await authService.login({ email, password });
+    
+    if (result.success) {
+      mixcoreConnected.set(true);
+      
+      // Load projects after successful login
+      try {
+        await projectActions.loadProjects();
+      } catch (projectError) {
+        console.warn('Failed to load projects after login:', projectError);
       }
-      return { success: false, error: 'Invalid credentials' };
-    } catch (error) {
-      console.error('Login failed:', error);
-      authError.set(error instanceof Error ? error.message : 'Login failed');
-      return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
     }
+    
+    return result;
+  },
+
+  async register(username: string, email: string, password: string, confirmPassword: string) {
+    return await authService.register({ username, email, password, confirmPassword });
   },
 
   async logout() {
-    this.stopTokenRefreshMonitoring();
-    await mixcoreService.logout();
-    user.set(null);
+    await authService.logout();
     currentProject.set(null);
     projects.set([]);
     chatMessages.set([]);
     mixcoreConnected.set(false);
-    tokenExpiry.set(null);
-    refreshInProgress.set(false);
-    authError.set(null);
-    localStorage.removeItem('mixcore_token_expiry');
   },
 
   async refreshToken(): Promise<boolean> {
-    if (get(refreshInProgress)) {
-      return false; // Already refreshing
-    }
-    
-    try {
-      refreshInProgress.set(true);
-      authError.set(null);
-      
-      const refreshed = await mixcoreService.refreshAuthToken();
-      
-      if (refreshed) {
-        // Update token expiry
-        const expiry = new Date();
-        expiry.setHours(expiry.getHours() + 1);
-        tokenExpiry.set(expiry);
-        localStorage.setItem('mixcore_token_expiry', expiry.toISOString());
-        console.log('✅ Token refreshed successfully');
-        return true;
-      } else {
-        console.warn('❌ Token refresh failed - logging out');
-        await this.logout();
-        return false;
-      }
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      authError.set('Session expired - please log in again');
-      await this.logout();
-      return false;
-    } finally {
-      refreshInProgress.set(false);
-    }
+    return await authService.refreshToken();
   },
 
-  // Token refresh monitoring
-  refreshInterval: null as any,
-  
-  startTokenRefreshMonitoring() {
-    this.stopTokenRefreshMonitoring();
-    
-    // Check every 5 minutes
-    this.refreshInterval = setInterval(() => {
-      const expiry = get(tokenExpiry);
-      if (!expiry) return;
-      
-      const now = new Date();
-      const timeUntilExpiry = expiry.getTime() - now.getTime();
-      
-      // Refresh if token expires in the next 10 minutes
-      if (timeUntilExpiry <= 10 * 60 * 1000 && timeUntilExpiry > 0) {
-        console.log('🔄 Token expiring soon, refreshing...');
-        this.refreshToken();
-      } else if (timeUntilExpiry <= 0) {
-        console.warn('⚠️ Token expired, logging out');
-        this.logout();
-      }
-    }, 5 * 60 * 1000);
-  },
-  
-  stopTokenRefreshMonitoring() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
+  async resetPassword(email: string) {
+    return await authService.resetPassword(email);
   },
 
   async initialize(retries = 3, delay = 1000) {
     try {
-      const initialized = await mixcoreService.initialize();
+      const initialized = await authService.initializeFromStorage();
+      
       if (initialized) {
-        const currentUser = mixcoreService.currentUser;
-        if (currentUser) {
-          user.set(currentUser);
-          mixcoreConnected.set(true);
-          
-          // Restore token expiry if available
-          const storedExpiry = localStorage.getItem('mixcore_token_expiry');
-          if (storedExpiry) {
-            tokenExpiry.set(new Date(storedExpiry));
-          }
-          
-          // Start token refresh monitoring
-          this.startTokenRefreshMonitoring();
-          
-          console.log('✅ Auth state restored from storage');
-          
-          // Try to load projects, but don't fail if it errors
-          try {
-            await projectActions.loadProjects();
-          } catch (projectError) {
-            console.warn('Failed to load projects during initialization:', projectError);
-          }
+        mixcoreConnected.set(true);
+        
+        // Try to load projects, but don't fail if it errors
+        try {
+          await projectActions.loadProjects();
+        } catch (projectError) {
+          console.warn('Failed to load projects during initialization:', projectError);
         }
       }
+      
       return initialized;
     } catch (error) {
       console.error('Initialization error:', error);
@@ -270,10 +210,7 @@ export const userActions = {
       }
       
       // Reset to safe state on permanent failure
-      user.set(null);
       mixcoreConnected.set(false);
-      tokenExpiry.set(null);
-      authError.set(null);
       return false;
     }
   }
