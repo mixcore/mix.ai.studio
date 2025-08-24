@@ -84,7 +84,6 @@ function handlePageSelect(page: PageContent) {
     console.log('🔄 Forcing iframe to load new page URL');
     iframeElement.src = newPreviewUrl;
   }
-  
   dispatch('pageSelect', page);
 }
 
@@ -223,11 +222,24 @@ $: if ($templateUpdateTrigger > 0 && iframeElement) {
 					value={activePage?.id || ''}
 					on:change={(e) => {
 						const target = e.target as HTMLSelectElement;
-						const selectedId = parseInt(target.value);
-						const selectedPage = pages.find(p => p.id === selectedId);
-						if (selectedPage) {
-							console.log('📄 Page selected:', selectedPage.title || selectedPage.seoName);
-							handlePageSelect(selectedPage);
+						const selectedValue = target.value;
+						console.log('🔍 Select change - raw value:', selectedValue);
+						
+						// Convert to number, handling both string and number cases
+						const selectedId = selectedValue ? parseInt(selectedValue.toString(), 10) : null;
+						console.log('🔍 Select change - parsed ID:', selectedId);
+						
+						if (selectedId && !isNaN(selectedId)) {
+							const selectedPage = pages.find(p => p.id === selectedId);
+							console.log('🔍 Select change - found page:', selectedPage);
+							if (selectedPage) {
+								console.log('📄 Page selected:', selectedPage.title || selectedPage.seoName);
+								handlePageSelect(selectedPage);
+							} else {
+								console.warn('⚠️ Page not found with ID:', selectedId);
+							}
+						} else {
+							console.warn('⚠️ Invalid page ID selected:', selectedValue);
 						}
 					}}
 				>

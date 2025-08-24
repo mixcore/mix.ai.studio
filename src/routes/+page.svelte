@@ -120,6 +120,59 @@
 	
 	// Reactive statement to ensure first page is selected when pages are loaded
 	$: if (pages.length > 0 && !activePage) {
+		console.log('🔄 REACTIVE: Pages available and no activePage set');
+		console.log('🔄 REACTIVE: pages.length:', pages.length);
+		console.log('🔄 REACTIVE: activePage current value:', activePage);
+		console.log('📄 Auto-selecting first page as default...');
+		const firstPage = pages[0];
+		console.log('📄 First page data:', JSON.stringify(firstPage, null, 2));
+		
+		// Validate the first page before setting it
+		if (firstPage && (firstPage.id || firstPage.seoName)) {
+			console.log('✅ First page is valid, setting as activePage');
+			activePage = firstPage;
+			console.log('📄 activePage after assignment:', activePage);
+			handlePageSelect(firstPage);
+		} else {
+			console.error('❌ First page is invalid:', firstPage);
+		}
+	}
+
+	// Monitor activePage changes
+	$: console.log('👁️ REACTIVE MONITOR: activePage changed to:', activePage);
+	
+	// Monitor pages array changes
+	$: console.log('📚 REACTIVE MONITOR: pages array changed, length:', pages.length);
+	
+	// Function to handle page selection
+	function handlePageSelect(event: CustomEvent<PageContent>) {
+		var page = event.detail;
+		console.log('📄 Handling page selection in +page.svelte:', page?.title || page?.seoName || 'No title/seoName');
+		console.log('📄 Page object details:', JSON.stringify(page, null, 2));
+		// Validate the page object before setting it
+		if (!page || (!page.id && !page.seoName)) {
+			console.error('❌ Invalid page object received:', page);
+			return;
+		}
+		
+		console.log('✅ Valid page object, setting as activePage');
+		activePage = page;
+		
+		// Update preview URL using detailUrl if available, otherwise fallback to seoName
+		const apiUrl = import.meta.env.VITE_MIXCORE_API_URL;
+		if (page.detailUrl) {
+			const newPreviewUrl = `${apiUrl}${page.detailUrl}`;
+			console.log('🔗 Setting preview URL from detailUrl:', newPreviewUrl);
+			previewUrl.set(newPreviewUrl);
+		} else if (page.seoName) {
+			const newPreviewUrl = `${apiUrl}/${page.seoName}`;
+			console.log('🔗 Setting preview URL from seoName:', newPreviewUrl);
+			previewUrl.set(newPreviewUrl);
+		}
+	}
+	
+	// Reactive statement to ensure first page is selected when pages are loaded
+	$: if (pages.length > 0 && !activePage) {
 		console.log('� REACTIVE: Pages available and no activePage set');
 		console.log('🔄 REACTIVE: pages.length:', pages.length);
 		console.log('🔄 REACTIVE: activePage current value:', activePage);
@@ -136,24 +189,6 @@
 	
 	// Monitor pages array changes
 	$: console.log('📚 REACTIVE MONITOR: pages array changed, length:', pages.length);
-	
-	// Function to handle page selection
-	function handlePageSelect(page: PageContent) {
-		console.log('📄 Handling page selection in +page.svelte:', page.title || page.seoName);
-		console.log('📄 Page object details:', JSON.stringify(page, null, 2));
-		activePage = page;
-		// Update preview URL using detailUrl if available, otherwise fallback to seoName
-		const apiUrl = import.meta.env.VITE_MIXCORE_API_URL;
-		if (page.detailUrl) {
-			const newPreviewUrl = `${apiUrl}${page.detailUrl}`;
-			console.log('🔗 Setting preview URL from detailUrl:', newPreviewUrl);
-			previewUrl.set(newPreviewUrl);
-		} else if (page.seoName) {
-			const newPreviewUrl = `${apiUrl}/${page.seoName}`;
-			console.log('🔗 Setting preview URL from seoName:', newPreviewUrl);
-			previewUrl.set(newPreviewUrl);
-		}
-	}
 	
 	
 	function handleWelcomeLogin() {
@@ -227,4 +262,3 @@
 	on:close={closeAuthModal}
 	on:success={handleAuthSuccess}
 />
-<FloatingChatToggle />

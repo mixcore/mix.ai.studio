@@ -150,16 +150,17 @@
       requestAnimationFrame(() => {
         immediateResize();
       });
-      
+      let msg = `${sanitizedInput} \n\nContext: ${dynamicPlaceholder}`;
+
       // Handle different modes
       if (currentMode === 'mixcore') {
         // Use Mixcore streaming service
         if (chatService) {
-          await chatService.sendMessage(sanitizedInput);
+          await chatService.sendMessage(msg);
         }
       } else {
         // Use external LLM service
-        await sendExternalLLMMessage(sanitizedInput);
+        await sendExternalLLMMessage(msg);
       }
       
     } catch (error) {
