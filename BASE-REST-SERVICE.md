@@ -234,7 +234,7 @@ try {
 
 ### Base URL Configuration
 
-The service uses a default base URL of `https://localhost:5010`. To change this:
+The service uses a default base URL of `https://mixcore.net`. To change this:
 
 ```typescript
 class CustomService extends BaseRestService<MyType> {

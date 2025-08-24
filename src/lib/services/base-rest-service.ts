@@ -43,7 +43,7 @@ export class BaseRestService<T> {
 
   constructor(modelName: string, authService?: AuthService) {
     // Load base URL from environment variable with fallback
-    this.baseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://localhost:5010';
+    this.baseUrl = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
     this.endpoint = `${this.baseUrl}/${modelName}`;
     this.authService = authService;
     this.mixClient = new MixcoreClient({
