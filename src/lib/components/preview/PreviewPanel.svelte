@@ -31,7 +31,7 @@ export let activePage: PageContent | null = null;
 const dispatch = createEventDispatcher();
 
 // Get the API URL from environment variables
-const MIXCORE_API_URL = import.meta.env.VITE_MIXCORE_API_URL;
+const MIXCORE_API_URL = import.meta.env.VITE_MIXCORE_API_URL || 'https://mixcore.net';
 
 // Map to hold cleanup functions per iframe element to avoid touching cross-origin frames
 const iframeCleanup = new WeakMap<HTMLIFrameElement, () => void>();
